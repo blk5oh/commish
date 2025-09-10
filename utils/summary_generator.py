@@ -231,17 +231,46 @@ def generate_sleeper_summary(league_id):
     # Initialize the Sleeper API League object
     league = SleeperLeague(league_id)
     current_date_today = datetime.datetime.now()
+    
     # Determine the most recently completed week
     week = helper.get_current_week(current_date_today)
+    LOGGER.info(f"Attempting to get data for week: {week}")
+    
     # Get necessary data from the league
     rosters = league.get_rosters()
     users = league.get_users()
     matchups = league.get_matchups(week)
     standings = league.get_standings(rosters, users)
 
+    # DEBUG: Log the matchup data structure
+    LOGGER.info(f"Number of matchups: {len(matchups) if matchups else 0}")
+    if matchups and len(matchups) > 0:
+        LOGGER.info(f"Sample matchup keys: {list(matchups[0].keys())}")
+        sample_matchup = matchups[0]
+        LOGGER.info(f"Sample matchup data: {sample_matchup}")
+        
+        # Check if players_points exists
+        if 'players_points' in sample_matchup:
+            players_points = sample_matchup['players_points']
+            LOGGER.info(f"Players points type: {type(players_points)}")
+            LOGGER.info(f"Players points sample: {list(players_points.items())[:3] if players_points else 'Empty or None'}")
+        else:
+            LOGGER.warning("No 'players_points' key found in matchup data!")
+            
+        # Check if points exists
+        if 'points' in sample_matchup:
+            LOGGER.info(f"Team total points: {sample_matchup['points']}")
+        else:
+            LOGGER.warning("No 'points' key found in matchup data!")
+
     # Get weekly players data from public json file
     players_url = "https://raw.githubusercontent.com/jeisey/commish/main/players_data.json"
     players_data = sleeper_helper.load_player_data(players_url)
+    
+    if not players_data:
+        LOGGER.warning("Failed to load players data from URL")
+    else:
+        LOGGER.info(f"Loaded {len(players_data)} players from data file")
 
     # Generate mappings
     user_team_mapping = league.map_users_to_team_name(users)

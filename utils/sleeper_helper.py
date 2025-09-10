@@ -55,7 +55,13 @@ def highest_scoring_player_of_week(matchups, players_data, user_team_mapping, ro
         owner_id = roster_owner_mapping.get(roster_id)
         team_name = user_team_mapping.get(owner_id, "Unknown Team")
         
-        for player_id, score in matchup['players_points'].items():
+        # FIX: Check if players_points exists and is not None
+        players_points = matchup.get('players_points', {})
+        if not players_points:
+            print(f"Warning: No players_points data for roster_id {roster_id}")
+            continue
+            
+        for player_id, score in players_points.items():
             if score > highest_score:
                 highest_score = score
                 highest_scoring_player = player_id
@@ -65,7 +71,7 @@ def highest_scoring_player_of_week(matchups, players_data, user_team_mapping, ro
         player_name = players_data[highest_scoring_player].get('full_name', 'Unknown Player')
         return player_name, highest_score, highest_scoring_player_team
     else:
-        return None, None, "Unknown Team"
+        return "No data available", 0.0, "Unknown Team"
 
 def lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping):
     lowest_score = float('inf')
@@ -77,18 +83,26 @@ def lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, ro
         owner_id = roster_owner_mapping.get(roster_id)
         team_name = user_team_mapping.get(owner_id, "Unknown Team")
         
-        for player_id in matchup['starters']:
-            score = matchup['players_points'].get(player_id, 0)
+        # FIX: Check if players_points exists and is not None
+        players_points = matchup.get('players_points', {})
+        starters = matchup.get('starters', [])
+        
+        if not players_points or not starters:
+            print(f"Warning: No players_points or starters data for roster_id {roster_id}")
+            continue
+        
+        for player_id in starters:
+            score = players_points.get(player_id, 0)
             if score < lowest_score:
                 lowest_score = score
                 lowest_scoring_player = player_id
                 lowest_scoring_player_team = team_name
                 
-    if lowest_scoring_player and lowest_scoring_player in players_data:
+    if lowest_scoring_player and lowest_scoring_player in players_data and lowest_score != float('inf'):
         player_name = players_data[lowest_scoring_player].get('full_name', 'Unknown Player')
         return player_name, lowest_score, lowest_scoring_player_team
     else:
-        return None, None, "Unknown Team"
+        return "No data available", 0.0, "Unknown Team"
 
 
 
@@ -102,8 +116,16 @@ def highest_scoring_benched_player_of_week(matchups, players_data, user_team_map
         owner_id = roster_owner_mapping.get(roster_id)
         team_name = user_team_mapping.get(owner_id, "Unknown Team")
         
-        for player_id, score in matchup['players_points'].items():
-            if player_id not in matchup['starters'] and score > highest_score:
+        # FIX: Check if players_points exists and is not None
+        players_points = matchup.get('players_points', {})
+        starters = matchup.get('starters', [])
+        
+        if not players_points:
+            print(f"Warning: No players_points data for roster_id {roster_id}")
+            continue
+        
+        for player_id, score in players_points.items():
+            if player_id not in starters and score > highest_score:
                 highest_score = score
                 highest_scoring_player = player_id
                 highest_scoring_player_team = team_name
@@ -112,7 +134,7 @@ def highest_scoring_benched_player_of_week(matchups, players_data, user_team_map
         player_name = players_data[highest_scoring_player].get('full_name', 'Unknown Player')
         return player_name, highest_score, highest_scoring_player_team
     else:
-        return None, None, "Unknown Team"
+        return "No data available", 0.0, "Unknown Team"
 
 def biggest_blowout_match_of_week(scoreboards):
     biggest_blowout = -1
@@ -177,7 +199,7 @@ def team_on_hottest_streak(rosters, user_team_mapping, roster_owner_mapping):
     for roster in rosters:
         owner_id = roster_owner_mapping.get(roster['roster_id'])
         team_name = user_team_mapping.get(owner_id, "Unknown Team")
-        streak = roster['metadata'].get('streak', '')
+        streak = roster['metadata'].get('streak', '') if roster.get('metadata') else ''
         if 'W' in streak:
             current_streak = int(streak.split('W')[0])
         else:
@@ -208,6 +230,3 @@ def calculate_scoreboards(matchups, user_team_mapping, roster_owner_mapping):
         matchups_dict[key] = sorted(matchups_dict[key], key=lambda x: -x[1])
     
     return matchups_dict
-
-
-
