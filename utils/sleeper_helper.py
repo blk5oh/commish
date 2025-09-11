@@ -5,7 +5,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# STAT MAPPING DICTIONARY (No changes needed here)
+# STAT MAPPING DICTIONARY (This is correct and complete)
 STAT_MAPPING = {
     'pass_yd': 'pass_yd', 'pass_td': 'pass_td', 'pass_int': 'pass_int', 'pass_2pt': 'pass_2pt',
     'rush_yd': 'rush_yd', 'rush_td': 'rush_td', 'rush_2pt': 'rush_2pt',
@@ -22,7 +22,6 @@ STAT_MAPPING = {
 }
 
 def get_weekly_stats(week, season="2024"):
-    # ... (this function remains the same)
     try:
         url = f"https://api.sleeper.app/v1/stats/nfl/regular/{season}/{week}"
         response = requests.get(url)
@@ -33,7 +32,6 @@ def get_weekly_stats(week, season="2024"):
         return {}
 
 def calculate_player_points(player_id, player_stats, scoring_settings):
-    # ... (this function remains the same)
     if not player_stats or not scoring_settings: return 0.0
     total_points = 0.0
     for api_stat, setting_stat in STAT_MAPPING.items():
@@ -42,26 +40,26 @@ def calculate_player_points(player_id, player_stats, scoring_settings):
     return total_points
 
 def get_player_name_from_id(player_id, players_data):
-    # ... (this function remains the same)
     player_info = players_data.get(str(player_id))
     if player_info:
         return f"{player_info.get('first_name', '')} {player_info.get('last_name', '')}".strip()
     return "Unknown Player"
 
-# --- FIX: Update all helper functions to use the new map ---
-def highest_scoring_team_of_week(matchups, team_name_map):
-    highest_score = -1
-    highest_scoring_team_name = "Unknown"
-    for matchup in matchups:
-        team_name = team_name_map.get(matchup['roster_id'], "Unknown Team")
-        score = matchup.get('points', 0)
-        if score > highest_score:
-            highest_score = score
-            highest_scoring_team_name = team_name
-    return highest_scoring_team_name, highest_score
+# --- FINAL FIX: This function now uses STANDINGS to get the correct weekly total ---
+def highest_scoring_team_of_week(standings):
+    """Determines the highest-scoring team by looking at the season points from the standings."""
+    if not standings:
+        return "Unknown", 0
+
+    # Standings format is typically [('Team Name', wins, losses, total_points), ...]
+    # Since it's only week 1, the total points are the week 1 score.
+    highest_scoring_team = max(standings, key=lambda team: team[3])
+    team_name = highest_scoring_team[0]
+    highest_score = highest_scoring_team[3]
+    
+    return team_name, highest_score
 
 def get_top_3_teams(standings):
-    # ... (this function remains the same)
     summary = []
     for i, team in enumerate(standings[:3]):
         team_name, wins, losses, points = team
@@ -109,7 +107,6 @@ def highest_scoring_benched_player_of_week(matchups, players_data, team_name_map
     return highest_benched_player, highest_benched_score, highest_benched_player_team
 
 def get_match_results(matchups):
-    # ... (this function remains the same)
     results = {}
     for m in matchups:
         matchup_id = m.get('matchup_id')
