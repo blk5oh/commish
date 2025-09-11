@@ -3,16 +3,16 @@ import os
 import json
 from sleeper_wrapper import League
 from utils.sleeper_helper import (
-    get_weekly_stats, 
+    get_weekly_stats,
     calculate_player_points,
     get_player_name_from_id,
-    highest_scoring_player_of_week, 
-    lowest_scoring_starter_of_week, 
-    highest_scoring_benched_player_of_week, 
-    biggest_blowout_match_of_week, 
-    closest_match_of_week, 
-    get_team_on_hottest_streak, 
-    get_top_3_teams, 
+    highest_scoring_player_of_week,
+    lowest_scoring_starter_of_week,
+    highest_scoring_benched_player_of_week,
+    biggest_blowout_match_of_week,
+    closest_match_of_week,
+    get_team_on_hottest_streak,
+    get_top_3_teams,
     highest_scoring_team_of_week
 )
 from datetime import datetime
@@ -25,12 +25,9 @@ logger = logging.getLogger(__name__)
 def get_current_week():
     """Gets the current week of the NFL season."""
     now = datetime.now()
-    # A simple way to estimate the start of the season is the first week of September
     season_start = datetime(now.year, 9, 1)
     if now < season_start:
         return 1 # Pre-season
-    
-    # Calculate weeks since the start of September
     days_since_sept1 = (now - season_start).days
     current_week = (days_since_sept1 // 7) + 1
     return max(1, current_week)
@@ -40,7 +37,7 @@ def generate_sleeper_summary(league_id, week=None):
     try:
         league = League(league_id)
         league_info = league.get_league()
-        
+
         season = league_info.get("season")
         if not season:
             st.error("Could not determine the season for this league.")
@@ -48,16 +45,16 @@ def generate_sleeper_summary(league_id, week=None):
 
         if week is None:
             if season != str(datetime.now().year):
-                week = 17 
+                week = 17
             else:
                 week = get_current_week()
-        
+
         users = league.get_users()
         rosters = league.get_rosters()
         matchups = league.get_matchups(week)
         standings = league.get_standings(rosters, users)
         scoring_settings = league_info.get("scoring_settings")
-        
+
     except Exception as e:
         logger.error(f"Error fetching Sleeper data: {e}")
         st.error(f"Failed to fetch data from Sleeper. Please check the League ID ({league_id}) and ensure it's correct. Error: {e}")
@@ -70,7 +67,7 @@ def generate_sleeper_summary(league_id, week=None):
 
     user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
     roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
-    
+
     weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
         st.warning(f"Could not fetch player stats for week {week}, season {season}. The summary may show 0.0 points.")
@@ -83,7 +80,7 @@ def generate_sleeper_summary(league_id, week=None):
             player_stats = weekly_stats.get(str(player_id), {})
             points = calculate_player_points(player_stats, scoring_settings)
             calculated_players_points[str(player_id)] = round(points, 2)
-            
+
             if player_id in matchup.get("starters", []):
                 total_team_points += points
 
@@ -92,29 +89,24 @@ def generate_sleeper_summary(league_id, week=None):
 
     # Load players data from the JSON file for name mapping
     try:
-        # --- ADDED DEBUGGING TO FIND THE FILE ---
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        players_file_path = os.path.join(project_root, 'data', 'players_data.json')
         
-        logger.info(f"Attempting to load player data from: {players_file_path}")
-        logger.info(f"Current working directory: {os.getcwd()}")
-        logger.info(f"Contents of project root ('{project_root}'): {os.listdir(project_root)}")
-        # --- END DEBUGGING ---
-
+        # --- FIX: Path now points to the root folder, not the 'data' subfolder ---
+        players_file_path = os.path.join(project_root, 'players_data.json')
+        
         with open(players_file_path, 'r') as f:
             players_data = json.load(f)
 
     except FileNotFoundError:
         logger.error(f"File not found at path: {players_file_path}")
-        # Display a more helpful error message in the Streamlit app
-        st.error(f"Player data file ('players_data.json') could not be found. The app is looking for it here: {players_file_path}. Please make sure this file exists in a 'data' folder at the root of your project.")
+        st.error(f"Player data file ('players_data.json') could not be found. The app is looking for it here: {players_file_path}.")
         return "Player data not found.", None
-    
+
     except Exception as e:
         logger.error(f"An error occurred while loading players_data.json: {e}")
         st.error(f"An unexpected error occurred while loading the player data file: {e}")
         return "Error loading player data.", None
-    
+
     # Generate individual summary components
     highest_score_team_name, highest_score = highest_scoring_team_of_week(matchups, user_team_mapping, roster_owner_mapping)
     top_3_teams_summary = get_top_3_teams(standings)
@@ -135,8 +127,8 @@ def generate_sleeper_summary(league_id, week=None):
         f"Closest match of the week: {closest_t1[0]} ({closest_t1[1]:.2f}) vs {closest_t2[0]} ({closest_t2[1]:.2f}) (Point Differential: {closest_diff:.2f}).",
         f"Team on the hottest streak: {hottest_streak_team} with a {streak} game win streak."
     ]
-    
+
     full_summary = "\n".join(summary_parts)
     logger.info(f"Sleeper Summary Generated for week {week}, season {season}:\n{full_summary}")
-    
+
     return full_summary, matchups
