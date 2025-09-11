@@ -25,8 +25,7 @@ def get_current_week():
     """Gets the current week of the NFL season."""
     now = datetime.now()
     season_start = datetime(now.year, 9, 1)
-    if now < season_start:
-        return 1
+    if now < season_start: return 1
     days_since_sept1 = (now - season_start).days
     current_week = (days_since_sept1 // 7) + 1
     return max(1, current_week)
@@ -47,8 +46,7 @@ def generate_sleeper_summary(league_id, week=None):
                 week = 17 
             else:
                 week = get_current_week() - 1
-                if week < 1:
-                    week = 1
+                if week < 1: week = 1
         
         users = league.get_users()
         rosters = league.get_rosters()
@@ -65,13 +63,11 @@ def generate_sleeper_summary(league_id, week=None):
         st.warning(f"No matchup data found for week {week} of the {season} season.")
         return f"No matchup data available for week {week}.", None
 
-    # --- FIX: Create a reliable mapping from roster_id to team name ---
     user_id_to_display_name = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
     roster_id_to_team_name_map = {
         roster['roster_id']: user_id_to_display_name.get(roster['owner_id'], 'Unknown Team')
         for roster in rosters
     }
-    # (The old roster_owner_mapping is no longer needed)
     
     weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
@@ -98,8 +94,9 @@ def generate_sleeper_summary(league_id, week=None):
         st.error(f"Player data file ('players_data.json') not found at: {players_file_path}.")
         return "Player data not found.", None
 
-    # Generate summary components using the new, reliable team name map
-    highest_score_team_name, highest_score = highest_scoring_team_of_week(matchups, roster_id_to_team_name_map)
+    # --- FINAL FIX: Pass standings to the high score function ---
+    highest_score_team_name, highest_score = highest_scoring_team_of_week(standings)
+    
     top_3_teams_summary = get_top_3_teams(standings)
     hs_player, hs_score, hs_team = highest_scoring_player_of_week(matchups, players_data, roster_id_to_team_name_map)
     ls_starter, ls_score, ls_team = lowest_scoring_starter_of_week(matchups, players_data, roster_id_to_team_name_map)
