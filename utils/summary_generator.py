@@ -24,47 +24,61 @@ logger = logging.getLogger(__name__)
 
 def get_current_week():
     """Gets the current week of the NFL season."""
-    # This function should be made more robust for a production app
-    # For now, it's a simple placeholder.
-    # Week 1 starts around September 5th, 2024.
-    start_date = datetime(2024, 9, 5)
-    delta = datetime.now() - start_date
-    current_week = (delta.days // 7) + 1
-    return max(1, current_week) # Return at least week 1
+    now = datetime.now()
+    # A simple way to estimate the start of the season is the first week of September
+    season_start = datetime(now.year, 9, 1)
+    if now < season_start:
+        return 1 # Pre-season
+    
+    # Calculate weeks since the start of September
+    days_since_sept1 = (now - season_start).days
+    current_week = (days_since_sept1 // 7) + 1
+    return max(1, current_week)
 
-def generate_sleeper_summary(league_id, week=None, year="2024"):
+def generate_sleeper_summary(league_id, week=None):
     """Generates the weekly summary for a Sleeper league."""
-    if week is None:
-        week = get_current_week()
-
     try:
         league = League(league_id)
+        league_info = league.get_league()
+        
+        # --- FIX: Automatically detect the season from the league data ---
+        season = league_info.get("season")
+        if not season:
+            st.error("Could not determine the season for this league.")
+            return "Error: League season not found.", None
+
+        # If week is not specified, determine a sensible default
+        if week is None:
+            if season != str(datetime.now().year):
+                # If it's a past season, default to a late week like 17
+                week = 17 
+            else:
+                week = get_current_week()
+        
         users = league.get_users()
         rosters = league.get_rosters()
         matchups = league.get_matchups(week)
         standings = league.get_standings(rosters, users)
-        league_info = league.get_league()
         scoring_settings = league_info.get("scoring_settings")
         
     except Exception as e:
         logger.error(f"Error fetching Sleeper data: {e}")
-        st.error(f"Failed to fetch data from Sleeper. Please check the League ID and try again. Error: {e}")
+        st.error(f"Failed to fetch data from Sleeper. Please check the League ID ({league_id}) and ensure it's correct. Error: {e}")
         return None, None
 
     if not matchups:
-        logger.warning(f"No matchups found for week {week}. The week may not have started yet.")
-        st.warning(f"No matchup data found for week {week}. The week may not have started yet.")
-        return "No matchup data available for the selected week.", None
+        logger.warning(f"No matchups found for week {week}. The week may not have started yet for season {season}.")
+        st.warning(f"No matchup data found for week {week} of the {season} season. This week's games may not have occurred yet.")
+        return f"No matchup data available for week {week} of the {season} season.", None
 
     user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
     roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
     
-    # Fetch all player stats for the week
-    weekly_stats = get_weekly_stats(week, year)
+    # --- FIX: Fetch stats for the correct, detected season ---
+    weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
-        st.warning(f"Could not fetch player stats for week {week}. Summary might be incomplete.")
+        st.warning(f"Could not fetch player stats for week {week}, season {season}. The summary may show 0.0 points.")
 
-    # Recalculate player points for each matchup
     for matchup in matchups:
         calculated_players_points = {}
         total_team_points = 0.0
@@ -74,16 +88,12 @@ def generate_sleeper_summary(league_id, week=None, year="2024"):
             points = calculate_player_points(player_stats, scoring_settings)
             calculated_players_points[str(player_id)] = round(points, 2)
             
-            # Sum points for starters
             if player_id in matchup.get("starters", []):
                 total_team_points += points
 
-        # Replace the (likely empty or zeroed) players_points with our calculated scores
         matchup['players_points'] = calculated_players_points
-        # Update the team's total points with the sum of starter points
         matchup['points'] = round(total_team_points, 2)
 
-    # Load players data from the JSON file for name mapping
     try:
         script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         players_file_path = os.path.join(script_dir, 'data', 'players_data.json')
@@ -104,7 +114,6 @@ def generate_sleeper_summary(league_id, week=None, year="2024"):
     (closest_t1, closest_t2), closest_diff = closest_match_of_week(matchups, user_team_mapping, roster_owner_mapping)
     hottest_streak_team, streak = get_team_on_hottest_streak(rosters, user_team_mapping)
 
-    # Construct the summary string
     summary_parts = [
         f"The highest scoring team of the week: {highest_score_team_name} with {highest_score:.2f} points.",
         f"Standings; Top 3 Teams:\n{top_3_teams_summary}",
@@ -117,6 +126,6 @@ def generate_sleeper_summary(league_id, week=None, year="2024"):
     ]
     
     full_summary = "\n".join(summary_parts)
-    logger.info(f"Sleeper Summary Generated for week {week}:\n{full_summary}")
+    logger.info(f"Sleeper Summary Generated for week {week}, season {season}:\n{full_summary}")
     
     return full_summary, matchups
