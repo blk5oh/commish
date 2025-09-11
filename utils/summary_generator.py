@@ -1,327 +1,122 @@
-from espn_api.football import League
-from yfpy.query import YahooFantasySportsQuery
-from sleeper_wrapper import League as SleeperLeague
-from utils import espn_helper, yahoo_helper, sleeper_helper, helper
-# from openai import OpenAI
-from openai import OpenAI
-import datetime
-import os
 import streamlit as st
-from streamlit.logger import get_logger
-LOGGER = get_logger(__name__)
+import os
+import json
+from sleeper_wrapper import League
+from utils.sleeper_helper import (
+    get_weekly_stats, 
+    calculate_player_points,
+    get_player_name_from_id,
+    highest_scoring_player_of_week, 
+    lowest_scoring_starter_of_week, 
+    highest_scoring_benched_player_of_week, 
+    biggest_blowout_match_of_week, 
+    closest_match_of_week, 
+    get_team_on_hottest_streak, 
+    get_top_3_teams, 
+    highest_scoring_team_of_week
+)
+from datetime import datetime
+import logging
 
-def moderate_text(client, text):
-    try:
-        # Send the moderation request
-        response = client.moderations.create(
-            input=text,
-            model="text-moderation-latest"  # Use the latest moderation model
-        )
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(name)s.%(funcName)s] %(message)s')
+logger = logging.getLogger(__name__)
 
-        # Extract the first result
-        result = response.results[0]
+def get_current_week():
+    """Gets the current week of the NFL season."""
+    # This function should be made more robust for a production app
+    # For now, it's a simple placeholder.
+    # Week 1 starts around September 5th, 2024.
+    start_date = datetime(2024, 9, 5)
+    delta = datetime.now() - start_date
+    current_week = (delta.days // 7) + 1
+    return max(1, current_week) # Return at least week 1
 
-        # Check if the content is flagged
-        if result.flagged:
-            # Log the flagged categories
-            flagged_categories = [
-                category for category, flagged in result.categories.items() if flagged
-            ]
-            LOGGER.warning(
-                "Moderation flagged the following categories: %s",
-                ", ".join(flagged_categories),
-            )
-            return False  # Return False if any category is flagged
-        return True  # Content is not flagged, return True
-
-    except Exception as e:
-        LOGGER.error("An error occurred during moderation: %s", str(e))
-        return False  # Assume text is inappropriate in case of an error
-
-# Lateny troubleshooting: https://platform.openai.com/docs/guides/production-best-practices/improving-latencies
-
-def generate_gpt4_summary_streaming(client, summary, character_choice, trash_talk_level):
-    # Construct the instruction for GPT-4 based on user inputs
-    instruction = f"You will be provided a summary below containing the most recent weekly stats for a fantasy football league. \
-    Create a weekly recap in the style of {character_choice}. Do not simply repeat every single stat verbatim - be creative while calling out stats and being on theme. You should include trash talk with a level of {trash_talk_level} based on a scale of 1-10 (1 being no trash talk, 10 being excessive hardcore trash talk); feel free to make fun of (or praise) team names and performances, and add a touch of humor related to the chosen character. \
-    Keep your summary concise enough (under 800 characters) as to not overwhelm the user with stats but still engaging, funny, thematic, and insightful. You can sprinkle in a few emojis if they are thematic. Only respond in character and do not reply with anything other than your recap. Begin by introducing \
-    your character. Here is the provided weekly fantasy summary: {summary}"
-
-    # Create the messages array
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": instruction}
-    ]
+def generate_sleeper_summary(league_id, week=None, year="2024"):
+    """Generates the weekly summary for a Sleeper league."""
+    if week is None:
+        week = get_current_week()
 
     try:
-        # Send the messages to OpenAI's GPT-4 for analysis
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Use the appropriate model
-            messages=messages,
-            max_tokens=1600,  # Control response length
-            stream=True
-        )
+        league = League(league_id)
+        users = league.get_users()
+        rosters = league.get_rosters()
+        matchups = league.get_matchups(week)
+        standings = league.get_standings(rosters, users)
+        league_info = league.get_league()
+        scoring_settings = league_info.get("scoring_settings")
         
-        # Extract and yield the GPT-4 generated message
-        for chunk in response:
-            # Access 'content' directly since 'delta' is an object, not a dictionary
-            if hasattr(chunk.choices[0].delta, 'content'):
-                yield chunk.choices[0].delta.content
-
     except Exception as e:
-        yield f"Error details: {e}"
+        logger.error(f"Error fetching Sleeper data: {e}")
+        st.error(f"Failed to fetch data from Sleeper. Please check the League ID and try again. Error: {e}")
+        return None, None
 
-# @st.cache_data(ttl=3600) - Cannot hash argument 'league'
-def generate_espn_summary(league, cw):
-    """
-    Generate a human-friendly summary based on the league stats.
-    
-    Args:
-    - league (League): The league object.
-    
-    Returns:
-    - str: A human-friendly summary.
-    """
-    # Extracting required data using helper functions
-    start_time = datetime.datetime.now()
-    top_teams = espn_helper.top_three_teams(league)
-    LOGGER.debug(
-        "Time for top_three_teams: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    top_scorer_week = espn_helper.top_scorer_of_week(league, cw)
-    LOGGER.debug(
-        "Time for top_scorer_of_week: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    worst_scorer_week = espn_helper.worst_scorer_of_week(league, cw)
-    LOGGER.debug(
-        "Time for worst_scorer_of_week: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    top_scorer_szn = espn_helper.top_scorer_of_season(league)
-    LOGGER.debug(
-        "Time for top_scorer_of_season: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    worst_scorer_szn = espn_helper.worst_scorer_of_season(league)
-    LOGGER.debug(
-        "Time for worst_scorer_of_season: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    most_trans = espn_helper.team_with_most_transactions(league)
-    LOGGER.debug(
-        "Time for team_with_most_transactions: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    most_injured = espn_helper.team_with_most_injured_players(league)
-    LOGGER.debug(
-        "Time for team_with_most_injured_players: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    highest_bench = espn_helper.highest_scoring_benched_player(league, cw)
-    LOGGER.debug(
-        "Time for highest_scoring_benched_player: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    lowest_start = espn_helper.lowest_scoring_starting_player(league, cw)
-    LOGGER.debug(
-        "Time for lowest_scoring_starting_player: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    biggest_blowout = espn_helper.biggest_blowout_match(league, cw)
-    LOGGER.debug(
-        "Time for biggest_blowout_match: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    closest_game = espn_helper.closest_game_match(league, cw)
-    LOGGER.debug(
-        "Time for closest_game_match: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    start_time = datetime.datetime.now()
-    top_scoring_team_Week = espn_helper.highest_scoring_team(league, cw)
-    LOGGER.debug(
-        "Time for top_scoring_team_string: %s seconds",
-        (datetime.datetime.now() - start_time).total_seconds(),
-    )
-    
-    # Formatting the summary
-    summary = f"""
-    - Top scoring fantasy team this week: {top_scoring_team_Week} 
-    - Top 3 fantasy teams: {espn_helper.clean_team_name(top_teams[0].team_name)}, {espn_helper.clean_team_name(top_teams[1].team_name)}, {espn_helper.clean_team_name(top_teams[2].team_name)}
-    - Top scoring NFL player of the week: {top_scorer_week[0].name} with {top_scorer_week[1]} points.
-    - Worst scoring NFL player of the week: {worst_scorer_week[0].name} with {worst_scorer_week[1]} points.
-    - Top scoring NFL player of the season: {top_scorer_szn[0].name} with {top_scorer_szn[1]} points.
-    - Worst scoring NFL player of the season: {worst_scorer_szn[0].name} with {worst_scorer_szn[1]} points.
-    - Fantasy Team with the most transactions: {espn_helper.clean_team_name(most_trans[0].team_name)} ({most_trans[1]} transactions)
-    - Fantasy Team with the most injured players: {espn_helper.clean_team_name(most_injured[0].team_name)} ({most_injured[1]} players: {', '.join(most_injured[2])})
-    - Highest scoring benched player: {highest_bench[0].name} with {highest_bench[0].points} points (Rostered by {espn_helper.clean_team_name(highest_bench[1].team_name)})
-    - Lowest scoring starting player of the week: {lowest_start[0].name} with {lowest_start[0].points} points (Rostered by {espn_helper.clean_team_name(lowest_start[1].team_name)})
-    - Biggest blowout match of the week: {espn_helper.clean_team_name(biggest_blowout.home_team.team_name)} ({biggest_blowout.home_score} points) vs {espn_helper.clean_team_name(biggest_blowout.away_team.team_name)} ({biggest_blowout.away_score} points)
-    - Closest game of the week: {espn_helper.clean_team_name(closest_game.home_team.team_name)} ({closest_game.home_score} points) vs {espn_helper.clean_team_name(closest_game.away_team.team_name)} ({closest_game.away_score} points)
-    """
-    
-    return summary.strip()
+    if not matchups:
+        logger.warning(f"No matchups found for week {week}. The week may not have started yet.")
+        st.warning(f"No matchup data found for week {week}. The week may not have started yet.")
+        return "No matchup data available for the selected week.", None
 
-@st.cache_data(ttl=3600)
-def get_espn_league_summary(league_id, espn2, SWID):
-    # Fetch data from ESPN Fantasy API and compute statistics   
-    start_time_league_connect = datetime.datetime.now() 
-    league_id = league_id
-    year = 2024
-    espn_s2 = espn2
-    swid = SWID
-    # Initialize league & current week
-    try:
-        league = League(league_id=league_id, year=year, espn_s2=espn_s2, swid=swid)
-    except Exception as e:
-        return str(e), "Error occurred during validation"
-    end_time_league_connect = datetime.datetime.now()
-    league_connect_duration = (end_time_league_connect - start_time_league_connect).total_seconds()
-    cw = league.current_week-1
-    # Generate summary
-    start_time_summary = datetime.datetime.now()
-    summary = generate_espn_summary(league, cw)
-    end_time_summary = datetime.datetime.now()
-    summary_duration = (end_time_summary - start_time_summary).total_seconds()
-    # Generage debugging information, placeholder for now
-    debug_info = "Summary: " + summary + " ~~~Timings~~~ " + f"League Connect Duration: {league_connect_duration} seconds " + f"Summary Duration: {summary_duration} seconds "
-    return summary, debug_info
-
-@st.cache_data(ttl=3600)
-def get_yahoo_league_summary(league_id, auth_path):    
-    league_id = league_id
-    LOGGER.info(f"League id: {league_id}")
-    auth_directory = auth_path
-    sc = YahooFantasySportsQuery(
-        auth_dir=auth_directory,
-        league_id=league_id,
-        game_code="nfl"
-    )
-    LOGGER.info(f"sc: {sc}")
-    mrw = yahoo_helper.get_most_recent_week(sc)
-    recap = yahoo_helper.generate_weekly_recap(sc, week=mrw)
-    return recap
-
-
-@st.cache_data(ttl=3600)
-def generate_sleeper_summary(league_id):
-    # Initialize the Sleeper API League object
-    league = SleeperLeague(league_id)
-    current_date_today = datetime.datetime.now()
+    user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
+    roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
     
-    # Determine the most recently completed week
-    week = helper.get_current_week(current_date_today)
-    LOGGER.info(f"Attempting to get data for week: {week}")
-    
-    # Get necessary data from the league
-    rosters = league.get_rosters()
-    users = league.get_users()
-    matchups = league.get_matchups(week)
-    standings = league.get_standings(rosters, users)
+    # Fetch all player stats for the week
+    weekly_stats = get_weekly_stats(week, year)
+    if not weekly_stats:
+        st.warning(f"Could not fetch player stats for week {week}. Summary might be incomplete.")
 
-    # DEBUG: Log the matchup data structure
-    LOGGER.info(f"Number of matchups: {len(matchups) if matchups else 0}")
-    if matchups and len(matchups) > 0:
-        LOGGER.info(f"Sample matchup keys: {list(matchups[0].keys())}")
-        sample_matchup = matchups[0]
-        LOGGER.info(f"Sample matchup data: {sample_matchup}")
-        
-        # Check if players_points exists
-        if 'players_points' in sample_matchup:
-            players_points = sample_matchup['players_points']
-            LOGGER.info(f"Players points type: {type(players_points)}")
-            LOGGER.info(f"Players points sample: {list(players_points.items())[:3] if players_points else 'Empty or None'}")
-        else:
-            LOGGER.warning("No 'players_points' key found in matchup data!")
+    # Recalculate player points for each matchup
+    for matchup in matchups:
+        calculated_players_points = {}
+        total_team_points = 0.0
+
+        for player_id in matchup.get("players", []):
+            player_stats = weekly_stats.get(str(player_id), {})
+            points = calculate_player_points(player_stats, scoring_settings)
+            calculated_players_points[str(player_id)] = round(points, 2)
             
-        # Check if points exists
-        if 'points' in sample_matchup:
-            LOGGER.info(f"Team total points: {sample_matchup['points']}")
-        else:
-            LOGGER.warning("No 'points' key found in matchup data!")
+            # Sum points for starters
+            if player_id in matchup.get("starters", []):
+                total_team_points += points
 
-    # Get weekly players data from public json file
-    players_url = "https://raw.githubusercontent.com/jeisey/commish/main/players_data.json"
-    players_data = sleeper_helper.load_player_data(players_url)
+        # Replace the (likely empty or zeroed) players_points with our calculated scores
+        matchup['players_points'] = calculated_players_points
+        # Update the team's total points with the sum of starter points
+        matchup['points'] = round(total_team_points, 2)
+
+    # Load players data from the JSON file for name mapping
+    try:
+        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        players_file_path = os.path.join(script_dir, 'data', 'players_data.json')
+        with open(players_file_path, 'r') as f:
+            players_data = json.load(f)
+    except FileNotFoundError:
+        logger.error("players_data.json not found.")
+        st.error("Player data file not found. Please ensure the file exists in the 'data' directory.")
+        return "Player data not found.", None
     
-    if not players_data:
-        LOGGER.warning("Failed to load players data from URL")
-    else:
-        LOGGER.info(f"Loaded {len(players_data)} players from data file")
-
-    # Generate mappings
-    user_team_mapping = league.map_users_to_team_name(users)
-    roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
-    
-    # Generate scoreboards for the week
-    scoreboards = sleeper_helper.calculate_scoreboards(matchups, user_team_mapping, roster_owner_mapping)
-
-    # 1. Highest Scoring Team of the Week
-    highest_scoring_team_name, highest_scoring_team_score = sleeper_helper.highest_scoring_team_of_week(scoreboards)
-
-    # 2. Standings; Top 3 Teams
-    top_3_teams_result = sleeper_helper.top_3_teams(standings)
-    
-    # 3. Highest Scoring Player of the Week
-    highest_scoring_player_week, weekly_score, highest_scoring_player_team_week = sleeper_helper.highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-
-    # 4. Lowest Scoring Player of the Week that Started
-    lowest_scoring_starter, lowest_starter_score, lowest_scoring_starter_team = sleeper_helper.lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-
-    # 5. Highest Scoring Benched Player of the Week
-    highest_scoring_benched_player, highest_benched_score, highest_scoring_benched_player_team = sleeper_helper.highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-
-    # 6. Biggest Blowout Match of the Week
-    blowout_teams, point_differential_blowout = sleeper_helper.biggest_blowout_match_of_week(scoreboards)
-
-    # 7. Closest Match of the Week
-    close_teams, point_differential_close = sleeper_helper.closest_match_of_week(scoreboards)
-
-    # 8. Team with Most Moves (this always seems to be zero, UPDATE)
-    # team_most_moves, most_moves = sleeper_helper.team_with_most_moves(rosters, user_team_mapping, roster_owner_mapping)
-    
-    # 9. Team on Hottest Streak
-    hottest_streak_team, longest_streak = sleeper_helper.team_on_hottest_streak(rosters, user_team_mapping, roster_owner_mapping)
-    
+    # Generate individual summary components
+    highest_score_team_name, highest_score = highest_scoring_team_of_week(matchups, user_team_mapping, roster_owner_mapping)
+    top_3_teams_summary = get_top_3_teams(standings)
+    hs_player, hs_player_score, hs_player_team = highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+    ls_starter, ls_starter_score, ls_starter_team = lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+    hs_benched_player, hs_benched_score, hs_benched_team = highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+    (blowout_t1, blowout_t2), blowout_diff = biggest_blowout_match_of_week(matchups, user_team_mapping, roster_owner_mapping)
+    (closest_t1, closest_t2), closest_diff = closest_match_of_week(matchups, user_team_mapping, roster_owner_mapping)
+    hottest_streak_team, streak = get_team_on_hottest_streak(rosters, user_team_mapping)
 
     # Construct the summary string
-    summary = (
-        f"The highest scoring team of the week: {highest_scoring_team_name} with {round(highest_scoring_team_score,2)} points\n"
-        f"Standings; Top 3 Teams:\n"
-        f"  1. {top_3_teams_result[0][0]} - {top_3_teams_result[0][3]} points ({top_3_teams_result[0][1]}W-{top_3_teams_result[0][2]}L)\n"
-        f"  2. {top_3_teams_result[1][0]} - {top_3_teams_result[1][3]} points ({top_3_teams_result[1][1]}W-{top_3_teams_result[1][2]}L)\n"
-        f"  3. {top_3_teams_result[2][0]} - {top_3_teams_result[2][3]} points ({top_3_teams_result[2][1]}W-{top_3_teams_result[2][2]}L)\n"
-        f"Highest scoring player of the week: {highest_scoring_player_week} with {weekly_score} points (Team: {highest_scoring_player_team_week})\n"
-        f"Lowest scoring player of the week that started: {lowest_scoring_starter} with {lowest_starter_score} points (Team: {lowest_scoring_starter_team})\n"
-        f"Highest scoring benched player of the week: {highest_scoring_benched_player} with {highest_benched_score} points (Team: {highest_scoring_benched_player_team})\n"
-        f"Biggest blowout match of the week: {blowout_teams[0]} vs {blowout_teams[1]} (Point Differential: {round(point_differential_blowout, 2)})\n"
-        f"Closest match of the week: {close_teams[0]} vs {close_teams[1]} (Point Differential: {round(point_differential_close, 2)})\n"
-        # f"Team with the most moves: {team_most_moves} with {most_moves} moves\n" #These always seems to be zero
-        f"Team on the hottest streak: {hottest_streak_team} with a {longest_streak} game win streak"
-    )
-    LOGGER.info(f"Sleeper Summary Generated: \n{summary}")
-
-    return summary
+    summary_parts = [
+        f"The highest scoring team of the week: {highest_score_team_name} with {highest_score:.2f} points.",
+        f"Standings; Top 3 Teams:\n{top_3_teams_summary}",
+        f"Highest scoring player of the week: {hs_player} with {hs_player_score:.2f} points (Team: {hs_player_team}).",
+        f"Lowest scoring player of the week that started: {ls_starter} with {ls_starter_score:.2f} points (Team: {ls_starter_team}).",
+        f"Highest scoring benched player of the week: {hs_benched_player} with {hs_benched_score:.2f} points (Team: {hs_benched_team}).",
+        f"Biggest blowout match of the week: {blowout_t1[0]} ({blowout_t1[1]:.2f}) vs {blowout_t2[0]} ({blowout_t2[1]:.2f}) (Point Differential: {blowout_diff:.2f}).",
+        f"Closest match of the week: {closest_t1[0]} ({closest_t1[1]:.2f}) vs {closest_t2[0]} ({closest_t2[1]:.2f}) (Point Differential: {closest_diff:.2f}).",
+        f"Team on the hottest streak: {hottest_streak_team} with a {streak} game win streak."
+    ]
+    
+    full_summary = "\n".join(summary_parts)
+    logger.info(f"Sleeper Summary Generated for week {week}:\n{full_summary}")
+    
+    return full_summary, matchups
