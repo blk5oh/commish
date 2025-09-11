@@ -24,12 +24,9 @@ logger = logging.getLogger(__name__)
 def get_current_week():
     """Gets the current week of the NFL season."""
     now = datetime.now()
-    # A simple way to estimate the start of the season is the first week of September
     season_start = datetime(now.year, 9, 1)
     if now < season_start:
-        return 1 # Pre-season
-    
-    # Calculate weeks since the start of September
+        return 1
     days_since_sept1 = (now - season_start).days
     current_week = (days_since_sept1 // 7) + 1
     return max(1, current_week)
@@ -47,12 +44,9 @@ def generate_sleeper_summary(league_id, week=None):
 
         if week is None:
             if season != str(datetime.now().year):
-                # If it's a past season, default to a final week.
                 week = 17 
             else:
-                # --- FIX: Fetch data for the week that just passed. ---
                 week = get_current_week() - 1
-                # Ensure the week is at least 1, in case it's run during week 1.
                 if week < 1:
                     week = 1
         
@@ -64,19 +58,24 @@ def generate_sleeper_summary(league_id, week=None):
         
     except Exception as e:
         logger.error(f"Error fetching Sleeper data: {e}", exc_info=True)
-        st.error(f"Failed to fetch data from Sleeper. Please check the League ID ({league_id}). Error: {e}")
+        st.error(f"Failed to fetch data from Sleeper. Error: {e}")
         return None, None
 
     if not matchups:
         st.warning(f"No matchup data found for week {week} of the {season} season.")
-        return f"No matchup data available for week {week} of the {season} season.", None
+        return f"No matchup data available for week {week}.", None
 
-    user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
-    roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
-
+    # --- FIX: Create a reliable mapping from roster_id to team name ---
+    user_id_to_display_name = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
+    roster_id_to_team_name_map = {
+        roster['roster_id']: user_id_to_display_name.get(roster['owner_id'], 'Unknown Team')
+        for roster in rosters
+    }
+    # (The old roster_owner_mapping is no longer needed)
+    
     weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
-        st.warning(f"Could not fetch player stats for week {week}, season {season}. Summary may be incomplete.")
+        st.warning(f"Could not fetch player stats for week {week}, season {season}.")
 
     for matchup in matchups:
         calculated_players_points = {}
@@ -99,15 +98,15 @@ def generate_sleeper_summary(league_id, week=None):
         st.error(f"Player data file ('players_data.json') not found at: {players_file_path}.")
         return "Player data not found.", None
 
-    # Generate summary components
-    highest_score_team_name, highest_score = highest_scoring_team_of_week(matchups, user_team_mapping, roster_owner_mapping)
+    # Generate summary components using the new, reliable team name map
+    highest_score_team_name, highest_score = highest_scoring_team_of_week(matchups, roster_id_to_team_name_map)
     top_3_teams_summary = get_top_3_teams(standings)
-    hs_player, hs_score, hs_team = highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-    ls_starter, ls_score, ls_team = lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-    hs_benched, hs_benched_score, hs_benched_team = highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-    (b_t1, b_t2), b_diff = biggest_blowout_match_of_week(matchups, user_team_mapping, roster_owner_mapping)
-    (c_t1, c_t2), c_diff = closest_match_of_week(matchups, user_team_mapping, roster_owner_mapping)
-    hottest_team, streak = get_team_on_hottest_streak(rosters, user_team_mapping)
+    hs_player, hs_score, hs_team = highest_scoring_player_of_week(matchups, players_data, roster_id_to_team_name_map)
+    ls_starter, ls_score, ls_team = lowest_scoring_starter_of_week(matchups, players_data, roster_id_to_team_name_map)
+    hs_benched, hs_benched_score, hs_benched_team = highest_scoring_benched_player_of_week(matchups, players_data, roster_id_to_team_name_map)
+    (b_t1, b_t2), b_diff = biggest_blowout_match_of_week(matchups, roster_id_to_team_name_map)
+    (c_t1, c_t2), c_diff = closest_match_of_week(matchups, roster_id_to_team_name_map)
+    hottest_team, streak = get_team_on_hottest_streak(rosters, roster_id_to_team_name_map)
 
     summary_parts = [
         f"The highest scoring team of the week: {highest_score_team_name} with {highest_score:.2f} points.",
