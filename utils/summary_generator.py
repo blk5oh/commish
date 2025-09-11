@@ -41,16 +41,13 @@ def generate_sleeper_summary(league_id, week=None):
         league = League(league_id)
         league_info = league.get_league()
         
-        # --- FIX: Automatically detect the season from the league data ---
         season = league_info.get("season")
         if not season:
             st.error("Could not determine the season for this league.")
             return "Error: League season not found.", None
 
-        # If week is not specified, determine a sensible default
         if week is None:
             if season != str(datetime.now().year):
-                # If it's a past season, default to a late week like 17
                 week = 17 
             else:
                 week = get_current_week()
@@ -74,7 +71,6 @@ def generate_sleeper_summary(league_id, week=None):
     user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
     roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
     
-    # --- FIX: Fetch stats for the correct, detected season ---
     weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
         st.warning(f"Could not fetch player stats for week {week}, season {season}. The summary may show 0.0 points.")
@@ -94,15 +90,30 @@ def generate_sleeper_summary(league_id, week=None):
         matchup['players_points'] = calculated_players_points
         matchup['points'] = round(total_team_points, 2)
 
+    # Load players data from the JSON file for name mapping
     try:
-        script_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        players_file_path = os.path.join(script_dir, 'data', 'players_data.json')
+        # --- ADDED DEBUGGING TO FIND THE FILE ---
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        players_file_path = os.path.join(project_root, 'data', 'players_data.json')
+        
+        logger.info(f"Attempting to load player data from: {players_file_path}")
+        logger.info(f"Current working directory: {os.getcwd()}")
+        logger.info(f"Contents of project root ('{project_root}'): {os.listdir(project_root)}")
+        # --- END DEBUGGING ---
+
         with open(players_file_path, 'r') as f:
             players_data = json.load(f)
+
     except FileNotFoundError:
-        logger.error("players_data.json not found.")
-        st.error("Player data file not found. Please ensure the file exists in the 'data' directory.")
+        logger.error(f"File not found at path: {players_file_path}")
+        # Display a more helpful error message in the Streamlit app
+        st.error(f"Player data file ('players_data.json') could not be found. The app is looking for it here: {players_file_path}. Please make sure this file exists in a 'data' folder at the root of your project.")
         return "Player data not found.", None
+    
+    except Exception as e:
+        logger.error(f"An error occurred while loading players_data.json: {e}")
+        st.error(f"An unexpected error occurred while loading the player data file: {e}")
+        return "Error loading player data.", None
     
     # Generate individual summary components
     highest_score_team_name, highest_score = highest_scoring_team_of_week(matchups, user_team_mapping, roster_owner_mapping)
