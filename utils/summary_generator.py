@@ -208,7 +208,26 @@ def generate_sleeper_summary(league_id):
         user_team_mapping = league.map_users_to_team_name(users)
         roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
         scoreboards = sleeper_helper.calculate_scoreboards(matchups, user_team_mapping, roster_owner_mapping)
-
+		# Get matchup data
+		blowout_match, blowout_diff = sleeper_helper.biggest_blowout_match_of_week(scoreboards)
+		close_match, close_diff = sleeper_helper.closest_match_of_week(scoreboards)
+		
+		# Format blowout match display
+		if blowout_match and len(blowout_match) >= 2:
+		    blowout_winner = blowout_match[0]
+		    blowout_loser = blowout_match[1]
+		    blowout_text = f"{blowout_winner[0]} ({blowout_winner[1]:.1f}) vs {blowout_loser[0]} ({blowout_loser[1]:.1f})"
+		else:
+		    blowout_text = "No matchup data available"
+		
+		# Format closest match display  
+		if close_match and len(close_match) >= 2:
+		    close_winner = close_match[0]
+		    close_loser = close_match[1]
+		    close_text = f"{close_winner[0]} ({close_winner[1]:.1f}) vs {close_loser[0]} ({close_loser[1]:.1f})"
+		else:
+		    close_text = "No matchup data available"
+		
         # Generate individual summary components
         highest_scoring_team_name, highest_scoring_team_score = sleeper_helper.highest_scoring_team_of_week(scoreboards)
         top_3_teams_result = sleeper_helper.top_3_teams(standings)
@@ -246,8 +265,8 @@ def generate_sleeper_summary(league_id):
             f"**Best Bench Player:** {hs_benched} scored **{hs_benched_score:.2f}** points on the bench for {hs_benched_team}.\n",
             "\n---\n",
             f"### Matchup Highlights\n",
-            f"**Biggest Blowout:** {blowout_teams[0]} vs {blowout_teams[1]} (Point Differential: **{blowout_diff:.2f}**).\n",
-            f"**Closest Game:** {close_teams[0]} vs {close_teams[1]} (Point Differential: **{close_diff:.2f}**).\n",
+			f"**Biggest Blowout:** {blowout_text} (Point Differential: **{blowout_diff:.2f}**)\n",
+			f"**Closest Game:** {close_text} (Point Differential: **{close_diff:.2f}**)\n",
             "\n---\n",
             f"### League Power Rankings\n",
             f"1. **{top_3_teams_result[0][0]}** ({top_3_teams_result[0][1]}W-{top_3_teams_result[0][2]}L) - {float(top_3_teams_result[0][3]):.2f} total points\n",
