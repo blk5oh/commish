@@ -17,23 +17,17 @@ from utils.sleeper_helper import (
 from datetime import datetime
 import logging
 
-# Configure logging
+# Configure logging to show up in the console
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(name)s.%(funcName)s] %(message)s')
 logger = logging.getLogger(__name__)
-
-def get_current_week():
-    """Gets the current week of the NFL season."""
-    now = datetime.now()
-    season_start = datetime(now.year, 9, 1)
-    if now < season_start:
-        return 1
-    days_since_sept1 = (now - season_start).days
-    current_week = (days_since_sept1 // 7) + 1
-    return max(1, current_week)
 
 def generate_sleeper_summary(league_id, week=None):
     """Generates the weekly summary for a Sleeper league."""
     try:
+        # --- BOLD STEP: For debugging, we will FORCE the script to look at Week 1 ---
+        week = 1 
+        # --- Once this works, you can remove this line to go back to dynamic week calculation ---
+
         league = League(league_id)
         league_info = league.get_league()
         season = league_info.get("season")
@@ -42,48 +36,44 @@ def generate_sleeper_summary(league_id, week=None):
             st.error("Could not determine the season for this league.")
             return "Error: League season not found.", None
 
-        if week is None:
-            week = get_current_week() if season == str(datetime.now().year) else 17
-
         users = league.get_users()
         rosters = league.get_rosters()
         matchups = league.get_matchups(week)
         standings = league.get_standings(rosters, users)
         scoring_settings = league_info.get("scoring_settings")
 
-        # --- LOGGING FOR DEBUGGING ---
-        logger.info(f"Successfully fetched league data for season {season}, week {week}.")
-        logger.info(f"SCORING SETTINGS: {json.dumps(scoring_settings, indent=2)}")
-        # --- END LOGGING ---
-
+        logger.info(f"--- DEBUGGING ---")
+        logger.info(f"Analyzing League: {league_info.get('name')} for Season: {season}, Week: {week}")
+        logger.info(f"LEAGUE SCORING SETTINGS: {json.dumps(scoring_settings, indent=2)}")
+        
     except Exception as e:
-        logger.error(f"Error fetching Sleeper data: {e}", exc_info=True)
-        st.error(f"Failed to fetch data from Sleeper. Please check the League ID ({league_id}). Error: {e}")
+        logger.error(f"Error during initial data fetch: {e}", exc_info=True)
+        st.error(f"Failed to fetch initial data from Sleeper. Please check the League ID ({league_id}). Error: {e}")
         return None, None
 
     if not matchups:
         st.warning(f"No matchup data found for week {week} of the {season} season.")
-        return f"No matchup data available for week {week} of the {season} season.", None
+        return f"No matchup data available for week {week}.", None
 
     user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
     roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
 
     weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
-        st.warning(f"Could not fetch player stats for week {week}, season {season}. Summary will show 0.0 points.")
-
-    # --- LOGGING FOR DEBUGGING ---
-    first_player_id = next(iter(weekly_stats), None)
-    if first_player_id:
-        logger.info(f"STATS FOR SAMPLE PLAYER ({first_player_id}): {json.dumps(weekly_stats[first_player_id], indent=2)}")
-    # --- END LOGGING ---
+        st.warning(f"CRITICAL: Could not fetch any player stats for week {week}, season {season}.")
+        return "Could not fetch player stats.", None
+    
+    # Log stats for the very first player we find to see what the data looks like
+    first_player_with_stats_id = next(iter(weekly_stats), None)
+    if first_player_with_stats_id:
+        logger.info(f"SAMPLE PLAYER STATS (Player ID {first_player_with_stats_id}): {json.dumps(weekly_stats[first_player_with_stats_id], indent=2)}")
 
     for matchup in matchups:
         calculated_players_points = {}
         total_team_points = 0.0
         for player_id_str in matchup.get("players", []):
             player_stats = weekly_stats.get(player_id_str, {})
-            points = calculate_player_points(player_stats, scoring_settings)
+            points = calculate_player_points(player_id_str, player_stats, scoring_settings)
             calculated_players_points[player_id_str] = round(points, 2)
             if player_id_str in matchup.get("starters", []):
                 total_team_points += points
@@ -96,7 +86,7 @@ def generate_sleeper_summary(league_id, week=None):
         with open(players_file_path, 'r') as f:
             players_data = json.load(f)
     except FileNotFoundError:
-        st.error(f"Player data file ('players_data.json') could not be found at: {players_file_path}.")
+        st.error(f"Player data file ('players_data.json') not found at: {players_file_path}.")
         return "Player data not found.", None
 
     # Generate summary components
@@ -121,6 +111,6 @@ def generate_sleeper_summary(league_id, week=None):
     ]
     
     full_summary = "\n".join(summary_parts)
-    logger.info(f"Sleeper Summary Generated:\n{full_summary}")
+    logger.info(f"--- FINAL SUMMARY ---:\n{full_summary}")
     
     return full_summary, matchups
