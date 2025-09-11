@@ -3,7 +3,43 @@ import os
 import requests
 
 # ##################################################################
-# NEW AND UPDATED HELPER FUNCTIONS
+# STAT MAPPING DICTIONARY
+# ##################################################################
+
+# This dictionary translates stat names from the Sleeper API response
+# to the keys used in the league's scoring_settings.
+STAT_MAPPING = {
+    'pass_yd': 'pass_yd',
+    'pass_td': 'pass_td',
+    'pass_int': 'pass_int',
+    'rush_yd': 'rush_yd',
+    'rush_td': 'rush_td',
+    'rec': 'rec',
+    'rec_yd': 'rec_yd',
+    'rec_td': 'rec_td',
+    'fum_lost': 'fum_lost',
+    'fgm': 'fgm',
+    'fga': 'fga',
+    'xpm': 'xpm',
+    'xpa': 'xpa',
+    'def_sack': 'sack',
+    'def_int': 'int',
+    'def_fum_rec': 'fum_rec',
+    'def_td': 'def_td',
+    'def_st_td': 'st_td',
+    'pts_allow_0': 'pts_allow_0',
+    'pts_allow_1_6': 'pts_allow_1_6',
+    'pts_allow_7_13': 'pts_allow_7_13',
+    'pts_allow_14_20': 'pts_allow_14_20',
+    'pts_allow_21_27': 'pts_allow_21_27',
+    'pts_allow_28_34': 'pts_allow_28_34',
+    'pts_allow_35p': 'pts_allow_35p',
+    # Add any other mappings you discover are needed by checking your logs
+}
+
+
+# ##################################################################
+# HELPER FUNCTIONS
 # ##################################################################
 
 def get_weekly_stats(week, season="2024"):
@@ -11,7 +47,7 @@ def get_weekly_stats(week, season="2024"):
     try:
         url = f"https://api.sleeper.app/v1/stats/nfl/{season}/{week}"
         response = requests.get(url)
-        response.raise_for_status()  # Will raise an HTTPError for bad responses (4xx or 5xx)
+        response.raise_for_status()
         return response.json()
     except requests.exceptions.RequestException as e:
         print(f"Error fetching weekly stats: {e}")
@@ -23,9 +59,13 @@ def calculate_player_points(player_stats, scoring_settings):
         return 0.0
     
     total_points = 0.0
-    for stat, value in player_stats.items():
-        if stat in scoring_settings:
-            total_points += value * scoring_settings[stat]
+    # Use the STAT_MAPPING to correctly calculate points
+    for api_stat_name, setting_stat_name in STAT_MAPPING.items():
+        if api_stat_name in player_stats and setting_stat_name in scoring_settings:
+            value = player_stats[api_stat_name]
+            score_per_stat = scoring_settings[setting_stat_name]
+            total_points += value * score_per_stat
+            
     return total_points
 
 def get_player_name_from_id(player_id, players_data):
@@ -34,10 +74,6 @@ def get_player_name_from_id(player_id, players_data):
     if player_info:
         return f"{player_info.get('first_name', '')} {player_info.get('last_name', '')}".strip()
     return "Unknown Player"
-
-# ##################################################################
-# EXISTING HELPER FUNCTIONS
-# ##################################################################
 
 def highest_scoring_team_of_week(matchups, user_team_mapping, roster_owner_mapping):
     """Determines the highest-scoring team of the week."""
@@ -90,7 +126,7 @@ def lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, ro
         players_points = matchup.get('players_points', {})
         starters = matchup.get('starters', [])
         for player_id in starters:
-            score = players_points.get(player_id, 0)
+            score = players_points.get(str(player_id), 0)
             if score < lowest_score:
                 lowest_score = score
                 lowest_scoring_player = get_player_name_from_id(player_id, players_data)
@@ -107,7 +143,7 @@ def highest_scoring_benched_player_of_week(matchups, players_data, user_team_map
         team_name = user_team_mapping.get(owner_id, "Unknown Team")
         players_points = matchup.get('players_points', {})
         starters = set(matchup.get('starters', []))
-        all_players = set(matchup.get('players', []))
+        all_players = set(map(str, matchup.get('players', []))) # Ensure IDs are strings
         benched_players = all_players - starters
         for player_id in benched_players:
             score = players_points.get(player_id, 0)
@@ -124,7 +160,7 @@ def get_match_results(matchups):
         matchup_id = m['matchup_id']
         if matchup_id not in results:
             results[matchup_id] = []
-        results[matchup_id].append({'roster_id': m['roster_id'], 'points': m['points']})
+        results[matchup_id].append({'roster_id': m['roster_id'], 'points': m.get('points', 0)})
     return list(results.values())
 
 def biggest_blowout_match_of_week(matchups, user_team_mapping, roster_owner_mapping):
@@ -138,16 +174,12 @@ def biggest_blowout_match_of_week(matchups, user_team_mapping, roster_owner_mapp
         if len(match) == 2:
             team1_roster_id = match[0]['roster_id']
             team2_roster_id = match[1]['roster_id']
-            
             team1_owner_id = roster_owner_mapping.get(team1_roster_id)
             team2_owner_id = roster_owner_mapping.get(team2_roster_id)
-
             team1_name = user_team_mapping.get(team1_owner_id, "Unknown Team")
             team2_name = user_team_mapping.get(team2_owner_id, "Unknown Team")
-            
-            team1_score = match[0]['points']
-            team2_score = match[1]['points']
-            
+            team1_score = match[0].get('points', 0)
+            team2_score = match[1].get('points', 0)
             diff = abs(team1_score - team2_score)
             if diff > biggest_diff:
                 biggest_diff = diff
@@ -166,16 +198,12 @@ def closest_match_of_week(matchups, user_team_mapping, roster_owner_mapping):
         if len(match) == 2:
             team1_roster_id = match[0]['roster_id']
             team2_roster_id = match[1]['roster_id']
-            
             team1_owner_id = roster_owner_mapping.get(team1_roster_id)
             team2_owner_id = roster_owner_mapping.get(team2_roster_id)
-
             team1_name = user_team_mapping.get(team1_owner_id, "Unknown Team")
             team2_name = user_team_mapping.get(team2_owner_id, "Unknown Team")
-            
-            team1_score = match[0]['points']
-            team2_score = match[1]['points']
-            
+            team1_score = match[0].get('points', 0)
+            team2_score = match[1].get('points', 0)
             diff = abs(team1_score - team2_score)
             if diff < closest_diff:
                 closest_diff = diff
@@ -190,10 +218,13 @@ def get_team_on_hottest_streak(rosters, user_team_mapping):
     for roster in rosters:
         owner_id = roster.get('owner_id')
         team_name = user_team_mapping.get(owner_id, "Unknown Team")
-        streak = roster.get('metadata', {}).get('streak', 'W0').replace('W', '')
-        if 'W' in roster.get('metadata', {}).get('streak', ''):
-            current_streak = int(streak)
-            if current_streak > hottest_streak:
-                hottest_streak = current_streak
-                hottest_team = team_name
+        streak_str = roster.get('metadata', {}).get('streak', 'W0')
+        if 'W' in streak_str:
+            try:
+                current_streak = int(streak_str.replace('W', ''))
+                if current_streak > hottest_streak:
+                    hottest_streak = current_streak
+                    hottest_team = team_name
+            except (ValueError, TypeError):
+                continue
     return hottest_team, hottest_streak
