@@ -8,47 +8,25 @@ logger = logging.getLogger(__name__)
 # ##################################################################
 # STAT MAPPING DICTIONARY
 # ##################################################################
-# This is the most critical part. It translates API stat names to your league's setting names.
-# This list has been expanded to include many common scoring settings.
 STAT_MAPPING = {
     # Passing
-    'pass_yd': 'pass_yd',
-    'pass_td': 'pass_td',
-    'pass_int': 'pass_int',
-    'pass_2pt': 'pass_2pt',
+    'pass_yd': 'pass_yd', 'pass_td': 'pass_td', 'pass_int': 'pass_int', 'pass_2pt': 'pass_2pt',
     # Rushing
-    'rush_yd': 'rush_yd',
-    'rush_td': 'rush_td',
-    'rush_2pt': 'rush_2pt',
+    'rush_yd': 'rush_yd', 'rush_td': 'rush_td', 'rush_2pt': 'rush_2pt',
     # Receiving
-    'rec': 'rec',
-    'rec_yd': 'rec_yd',
-    'rec_td': 'rec_td',
-    'rec_2pt': 'rec_2pt',
+    'rec': 'rec', 'rec_yd': 'rec_yd', 'rec_td': 'rec_td', 'rec_2pt': 'rec_2pt',
     # Miscellaneous Offense
-    'fum_lost': 'fum_lost',
-    'fum_rec_td': 'fum_rec_td',
-    'st_td': 'st_td',
+    'fum_lost': 'fum_lost', 'fum_rec_td': 'fum_rec_td', 'st_td': 'st_td',
     # Kicking
-    'fgm': 'fgm', 'fga': 'fga',
-    'xpm': 'xpm', 'xpa': 'xpa',
-    'fgm_0_19': 'fgm_0_19', 'fgm_20_29': 'fgm_20_29',
-    'fgm_30_39': 'fgm_30_39', 'fgm_40_49': 'fgm_40_49',
-    'fgm_50p': 'fgm_50p',
+    'fgm': 'fgm', 'fga': 'fga', 'xpm': 'xpm', 'xpa': 'xpa',
+    'fgm_0_19': 'fgm_0_19', 'fgm_20_29': 'fgm_20_29', 'fgm_30_39': 'fgm_30_39',
+    'fgm_40_49': 'fgm_40_49', 'fgm_50p': 'fgm_50p',
     # Defense/Special Teams
-    'def_sack': 'sack',
-    'def_int': 'int',
-    'def_fum_rec': 'fum_rec',
-    'def_td': 'def_td',
-    'def_st_td': 'st_td',
-    'def_safety': 'safe',
-    'pts_allow_0': 'pts_allow_0',
-    'pts_allow_1_6': 'pts_allow_1_6',
-    'pts_allow_7_13': 'pts_allow_7_13',
-    'pts_allow_14_20': 'pts_allow_14_20',
-    'pts_allow_21_27': 'pts_allow_21_27',
-    'pts_allow_28_34': 'pts_allow_28_34',
-    'pts_allow_35p': 'pts_allow_35p',
+    'def_sack': 'sack', 'def_int': 'int', 'def_fum_rec': 'fum_rec', 'def_td': 'def_td',
+    'def_st_td': 'st_td', 'def_safety': 'safe',
+    'pts_allow_0': 'pts_allow_0', 'pts_allow_1_6': 'pts_allow_1_6', 'pts_allow_7_13': 'pts_allow_7_13',
+    'pts_allow_14_20': 'pts_allow_14_20', 'pts_allow_21_27': 'pts_allow_21_27',
+    'pts_allow_28_34': 'pts_allow_28_34', 'pts_allow_35p': 'pts_allow_35p',
 }
 
 # ##################################################################
@@ -72,21 +50,12 @@ def calculate_player_points(player_id, player_stats, scoring_settings):
         return 0.0
     
     total_points = 0.0
-    calculation_log = []
-
-    # Use the STAT_MAPPING to correctly calculate points
     for api_stat_name, setting_stat_name in STAT_MAPPING.items():
         if api_stat_name in player_stats and setting_stat_name in scoring_settings:
             value = player_stats[api_stat_name]
             score_per_stat = scoring_settings[setting_stat_name]
-            points_for_stat = value * score_per_stat
-            total_points += points_for_stat
-            if points_for_stat != 0:
-                 calculation_log.append(f"  - {api_stat_name}: {value} * {score_per_stat} = {points_for_stat:.2f} pts")
-
-    if calculation_log:
-        logger.info(f"Point calculation for Player ID {player_id}:\n" + "\n".join(calculation_log) + f"\n  - TOTAL: {total_points:.2f}")
-
+            total_points += value * score_per_stat
+            
     return total_points
 
 def get_player_name_from_id(player_id, players_data):
@@ -96,7 +65,6 @@ def get_player_name_from_id(player_id, players_data):
         return f"{player_info.get('first_name', '')} {player_info.get('last_name', '')}".strip()
     return "Unknown Player"
 
-# (The rest of the functions: highest_scoring_team_of_week, get_top_3_teams, etc. remain the same)
 def highest_scoring_team_of_week(matchups, user_team_mapping, roster_owner_mapping):
     highest_score = -1
     highest_scoring_team_name = "Unknown"
