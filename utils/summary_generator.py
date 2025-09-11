@@ -46,11 +46,15 @@ def generate_sleeper_summary(league_id, week=None):
             return "Error: League season not found.", None
 
         if week is None:
-            # If the league is from a past season, default to a final week, otherwise get the current week.
             if season != str(datetime.now().year):
+                # If it's a past season, default to a final week.
                 week = 17 
             else:
-                week = get_current_week()
+                # --- FIX: Fetch data for the week that just passed. ---
+                week = get_current_week() - 1
+                # Ensure the week is at least 1, in case it's run during week 1.
+                if week < 1:
+                    week = 1
         
         users = league.get_users()
         rosters = league.get_rosters()
