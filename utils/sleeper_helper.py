@@ -45,25 +45,25 @@ def get_player_name_from_id(player_id, players_data):
         return f"{player_info.get('first_name', '')} {player_info.get('last_name', '')}".strip()
     return "Unknown Player"
 
-# --- FINAL FIX: This function now uses STANDINGS to get the correct weekly total ---
+# --- FINAL FIX: Convert score to float to prevent the crash ---
 def highest_scoring_team_of_week(standings):
     """Determines the highest-scoring team by looking at the season points from the standings."""
     if not standings:
-        return "Unknown", 0
+        return "Unknown", 0.0
 
-    # Standings format is typically [('Team Name', wins, losses, total_points), ...]
-    # Since it's only week 1, the total points are the week 1 score.
-    highest_scoring_team = max(standings, key=lambda team: team[3])
+    highest_scoring_team = max(standings, key=lambda team: float(team[3]))
     team_name = highest_scoring_team[0]
-    highest_score = highest_scoring_team[3]
+    highest_score = float(highest_scoring_team[3])
     
     return team_name, highest_score
 
+# --- FINAL FIX: Convert points to float here as well ---
 def get_top_3_teams(standings):
     summary = []
     for i, team in enumerate(standings[:3]):
-        team_name, wins, losses, points = team
-        summary.append(f"  {i+1}. {team_name} - {points} points ({wins}W-{losses}L)")
+        team_name, wins, losses, points_str = team
+        points = float(points_str)
+        summary.append(f"  {i+1}. {team_name} - {points:.2f} points ({wins}W-{losses}L)")
     return "\n".join(summary)
 
 def highest_scoring_player_of_week(matchups, players_data, team_name_map):
