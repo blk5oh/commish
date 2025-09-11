@@ -17,17 +17,26 @@ from utils.sleeper_helper import (
 from datetime import datetime
 import logging
 
-# Configure logging to show up in the console
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(name)s.%(funcName)s] %(message)s')
 logger = logging.getLogger(__name__)
+
+def get_current_week():
+    """Gets the current week of the NFL season."""
+    now = datetime.now()
+    # A simple way to estimate the start of the season is the first week of September
+    season_start = datetime(now.year, 9, 1)
+    if now < season_start:
+        return 1 # Pre-season
+    
+    # Calculate weeks since the start of September
+    days_since_sept1 = (now - season_start).days
+    current_week = (days_since_sept1 // 7) + 1
+    return max(1, current_week)
 
 def generate_sleeper_summary(league_id, week=None):
     """Generates the weekly summary for a Sleeper league."""
     try:
-        # --- BOLD STEP: For debugging, we will FORCE the script to look at Week 1 ---
-        week = 1 
-        # --- Once this works, you can remove this line to go back to dynamic week calculation ---
-
         league = League(league_id)
         league_info = league.get_league()
         season = league_info.get("season")
@@ -36,37 +45,34 @@ def generate_sleeper_summary(league_id, week=None):
             st.error("Could not determine the season for this league.")
             return "Error: League season not found.", None
 
+        if week is None:
+            # If the league is from a past season, default to a final week, otherwise get the current week.
+            if season != str(datetime.now().year):
+                week = 17 
+            else:
+                week = get_current_week()
+        
         users = league.get_users()
         rosters = league.get_rosters()
         matchups = league.get_matchups(week)
         standings = league.get_standings(rosters, users)
         scoring_settings = league_info.get("scoring_settings")
-
-        logger.info(f"--- DEBUGGING ---")
-        logger.info(f"Analyzing League: {league_info.get('name')} for Season: {season}, Week: {week}")
-        logger.info(f"LEAGUE SCORING SETTINGS: {json.dumps(scoring_settings, indent=2)}")
         
     except Exception as e:
-        logger.error(f"Error during initial data fetch: {e}", exc_info=True)
-        st.error(f"Failed to fetch initial data from Sleeper. Please check the League ID ({league_id}). Error: {e}")
+        logger.error(f"Error fetching Sleeper data: {e}", exc_info=True)
+        st.error(f"Failed to fetch data from Sleeper. Please check the League ID ({league_id}). Error: {e}")
         return None, None
 
     if not matchups:
         st.warning(f"No matchup data found for week {week} of the {season} season.")
-        return f"No matchup data available for week {week}.", None
+        return f"No matchup data available for week {week} of the {season} season.", None
 
     user_team_mapping = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
     roster_owner_mapping = {roster['roster_id']: roster['owner_id'] for roster in rosters}
 
     weekly_stats = get_weekly_stats(week, season)
     if not weekly_stats:
-        st.warning(f"CRITICAL: Could not fetch any player stats for week {week}, season {season}.")
-        return "Could not fetch player stats.", None
-    
-    # Log stats for the very first player we find to see what the data looks like
-    first_player_with_stats_id = next(iter(weekly_stats), None)
-    if first_player_with_stats_id:
-        logger.info(f"SAMPLE PLAYER STATS (Player ID {first_player_with_stats_id}): {json.dumps(weekly_stats[first_player_with_stats_id], indent=2)}")
+        st.warning(f"Could not fetch player stats for week {week}, season {season}. Summary may be incomplete.")
 
     for matchup in matchups:
         calculated_players_points = {}
@@ -111,6 +117,6 @@ def generate_sleeper_summary(league_id, week=None):
     ]
     
     full_summary = "\n".join(summary_parts)
-    logger.info(f"--- FINAL SUMMARY ---:\n{full_summary}")
+    logger.info(f"Sleeper Summary Generated Successfully for week {week}, season {season}.")
     
     return full_summary, matchups
