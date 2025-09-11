@@ -1,122 +1,62 @@
-import streamlit as st
-import os
-import json
-from sleeper_wrapper import League
-from utils.sleeper_helper import (
-    get_weekly_stats,
-    calculate_player_points,
-    highest_scoring_player_of_week,
-    lowest_scoring_starter_of_week,
-    highest_scoring_benched_player_of_week,
-    biggest_blowout_match_of_week,
-    closest_match_of_week,
-    get_team_on_hottest_streak,
-    get_top_3_teams,
-    highest_scoring_team_of_week
-)
-from datetime import datetime
-import logging
-
-# Configure logging
-logging.basicConfig(level=logging.INFO, format='[%(asctime)s] [%(levelname)s] [%(name)s.%(funcName)s] %(message)s')
-logger = logging.getLogger(__name__)
-
-def get_current_week():
-    """Gets the current week of the NFL season."""
-    now = datetime.now()
-    season_start = datetime(now.year, 9, 1)
-    if now < season_start: return 1
-    days_since_sept1 = (now - season_start).days
-    current_week = (days_since_sept1 // 7) + 1
-    return max(1, current_week)
-
-def generate_sleeper_summary(league_id, week=None):
-    """Generates the weekly summary for a Sleeper league."""
-    try:
-        league = League(league_id)
-        league_info = league.get_league()
-        season = league_info.get("season")
-
-        if not season:
-            st.error("Could not determine the season for this league.")
-            return "Error: League season not found.", None
-
-        if week is None:
-            if season != str(datetime.now().year):
-                week = 17 
-            else:
-                week = get_current_week() - 1
-                if week < 1: week = 1
-        
-        users = league.get_users()
-        rosters = league.get_rosters()
-        matchups = league.get_matchups(week)
-        standings = league.get_standings(rosters, users)
-        scoring_settings = league_info.get("scoring_settings")
-        
-    except Exception as e:
-        logger.error(f"Error fetching Sleeper data: {e}", exc_info=True)
-        st.error(f"Failed to fetch data from Sleeper. Error: {e}")
-        return None, None
-
-    if not matchups:
-        st.warning(f"No matchup data found for week {week} of the {season} season.")
-        return f"No matchup data available for week {week}.", None
-
-    user_id_to_display_name = {user['user_id']: user.get('metadata', {}).get('team_name') or user['display_name'] for user in users}
-    roster_id_to_team_name_map = {
-        roster['roster_id']: user_id_to_display_name.get(roster['owner_id'], 'Unknown Team')
-        for roster in rosters
-    }
+@st.cache_data(ttl=3600)
+def generate_sleeper_summary(league_id):
+    """
+    Generates a human-friendly summary for a Sleeper league.
     
-    weekly_stats = get_weekly_stats(week, season)
-    if not weekly_stats:
-        st.warning(f"Could not fetch player stats for week {week}, season {season}.")
-
-    for matchup in matchups:
-        calculated_players_points = {}
-        total_team_points = 0.0
-        for player_id_str in matchup.get("players", []):
-            player_stats = weekly_stats.get(player_id_str, {})
-            points = calculate_player_points(player_id_str, player_stats, scoring_settings)
-            calculated_players_points[player_id_str] = round(points, 2)
-            if player_id_str in matchup.get("starters", []):
-                total_team_points += points
-        matchup['players_points'] = calculated_players_points
-        matchup['points'] = round(total_team_points, 2)
-
-    try:
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        players_file_path = os.path.join(project_root, 'players_data.json')
-        with open(players_file_path, 'r') as f:
-            players_data = json.load(f)
-    except FileNotFoundError:
-        st.error(f"Player data file ('players_data.json') not found at: {players_file_path}.")
-        return "Player data not found.", None
-
-    # --- FINAL FIX: Pass standings to the high score function ---
-    highest_score_team_name, highest_score = highest_scoring_team_of_week(standings)
+    Args:
+    - league_id (str): The ID of the Sleeper league.
     
-    top_3_teams_summary = get_top_3_teams(standings)
-    hs_player, hs_score, hs_team = highest_scoring_player_of_week(matchups, players_data, roster_id_to_team_name_map)
-    ls_starter, ls_score, ls_team = lowest_scoring_starter_of_week(matchups, players_data, roster_id_to_team_name_map)
-    hs_benched, hs_benched_score, hs_benched_team = highest_scoring_benched_player_of_week(matchups, players_data, roster_id_to_team_name_map)
-    (b_t1, b_t2), b_diff = biggest_blowout_match_of_week(matchups, roster_id_to_team_name_map)
-    (c_t1, c_t2), c_diff = closest_match_of_week(matchups, roster_id_to_team_name_map)
-    hottest_team, streak = get_team_on_hottest_streak(rosters, roster_id_to_team_name_map)
+    Returns:
+    - str: A human-friendly summary.
+    """
+    # Initialize the Sleeper API League object
+    league = SleeperLeague(league_id)
+    current_date_today = datetime.datetime.now()
+    week = helper.get_current_week(current_date_today)
 
+    # Get necessary data from the league
+    rosters = league.get_rosters()
+    users = league.get_users()
+    matchups = league.get_matchups(week)
+    standings = league.get_standings(rosters, users)
+
+    # Get weekly players data from public json file
+    players_url = "https://raw.githubusercontent.com/jeisey/commish/main/players_data.json"
+    players_data = sleeper_helper.load_player_data(players_url)
+
+    # Generate mappings
+    user_team_mapping = league.map_users_to_team_name(users)
+    roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
+    
+    # Generate scoreboards for the week
+    scoreboards = sleeper_helper.calculate_scoreboards(matchups, user_team_mapping, roster_owner_mapping)
+
+    # --- Generate individual summary components ---
+    highest_scoring_team_name, highest_scoring_team_score = sleeper_helper.highest_scoring_team_of_week(scoreboards)
+    top_3_teams_result = sleeper_helper.top_3_teams(standings)
+    highest_scoring_player_week, weekly_score, highest_scoring_player_team_week = sleeper_helper.highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+    lowest_scoring_starter, lowest_starter_score, lowest_scoring_starter_team = sleeper_helper.lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+    highest_scoring_benched_player, highest_benched_score, highest_scoring_benched_player_team = sleeper_helper.highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+    blowout_teams, point_differential_blowout = sleeper_helper.biggest_blowout_match_of_week(scoreboards)
+    close_teams, point_differential_close = sleeper_helper.closest_match_of_week(scoreboards)
+    hottest_streak_team, longest_streak = sleeper_helper.team_on_hottest_streak(rosters, user_team_mapping, roster_owner_mapping)
+
+    # --- Construct the summary string using a list for better readability ---
     summary_parts = [
-        f"The highest scoring team of the week: {highest_score_team_name} with {highest_score:.2f} points.",
-        f"Standings; Top 3 Teams:\n{top_3_teams_summary}",
-        f"Highest scoring player of the week: {hs_player} with {hs_score:.2f} points (Team: {hs_team}).",
-        f"Lowest scoring player of the week that started: {ls_starter} with {ls_score:.2f} points (Team: {ls_team}).",
-        f"Highest scoring benched player of the week: {hs_benched} with {hs_benched_score:.2f} points (Team: {hs_benched_team}).",
-        f"Biggest blowout match of the week: {b_t1[0]} ({b_t1[1]:.2f}) vs {b_t2[0]} ({b_t2[1]:.2f}) (Point Differential: {b_diff:.2f}).",
-        f"Closest match of the week: {c_t1[0]} ({c_t1[1]:.2f}) vs {c_t2[0]} ({c_t2[1]:.2f}) (Point Differential: {c_diff:.2f}).",
-        f"Team on the hottest streak: {hottest_team} with a {streak} game win streak."
+        f"The highest scoring team of the week: {highest_scoring_team_name} with {round(highest_scoring_team_score, 2)} points.",
+        "Standings; Top 3 Teams:",
+        f"  1. {top_3_teams_result[0][0]} - {top_3_teams_result[0][3]} points ({top_3_teams_result[0][1]}W-{top_3_teams_result[0][2]}L)",
+        f"  2. {top_3_teams_result[1][0]} - {top_3_teams_result[1][3]} points ({top_3_teams_result[1][1]}W-{top_3_teams_result[1][2]}L)",
+        f"  3. {top_3_teams_result[2][0]} - {top_3_teams_result[2][3]} points ({top_3_teams_result[2][1]}W-{top_3_teams_result[2][2]}L)",
+        f"Highest scoring player of the week: {highest_scoring_player_week} with {weekly_score} points (Team: {highest_scoring_player_team_week}).",
+        f"Lowest scoring player of the week that started: {lowest_scoring_starter} with {lowest_starter_score} points (Team: {lowest_scoring_starter_team}).",
+        f"Highest scoring benched player of the week: {highest_scoring_benched_player} with {highest_benched_score} points (Team: {highest_scoring_benched_player_team}).",
+        f"Biggest blowout match of the week: {blowout_teams[0]} vs {blowout_teams[1]} (Point Differential: {round(point_differential_blowout, 2)}).",
+        f"Closest match of the week: {close_teams[0]} vs {close_teams[1]} (Point Differential: {round(point_differential_close, 2)}).",
+        f"Team on the hottest streak: {hottest_streak_team} with a {longest_streak} game win streak."
     ]
     
-    full_summary = "\n".join(summary_parts)
-    logger.info(f"Sleeper Summary Generated Successfully for week {week}, season {season}.")
-    
-    return full_summary, matchups
+    summary = "\n".join(summary_parts)
+    LOGGER.info(f"Sleeper Summary Generated: \n{summary}")
+
+    return summary
