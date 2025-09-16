@@ -127,7 +127,7 @@ def get_espn_league_summary(league_id, espn2, SWID):
     league_connect_duration = (end_time_league_connect - start_time_league_connect).total_seconds()
     
     # Use dynamic week calculation
-    cw = helper.get_most_recent_completed_week(datetime.datetime.now())
+    cw = helper.get_safest_week_for_recap(datetime.datetime.now())
     
     # Generate summary
     start_time_summary = datetime.datetime.now()
@@ -150,7 +150,7 @@ def get_yahoo_league_summary(league_id, auth_path):
     )
     LOGGER.info(f"sc: {sc}")
     # Use dynamic week calculation instead of hardcoded
-    week = helper.get_most_recent_completed_week(datetime.datetime.now())
+    week = helper.get_safest_week_for_recap(datetime.datetime.now())
     recap = yahoo_helper.generate_weekly_recap(sc, week=week)
     return recap
 
@@ -208,10 +208,18 @@ def generate_sleeper_summary(league_id):
         user_team_mapping = league.map_users_to_team_name(users)
         roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
         scoreboards = sleeper_helper.calculate_scoreboards(matchups, user_team_mapping, roster_owner_mapping)
-        # Get matchup data
+
+        # Generate individual summary components
+        highest_scoring_team_name, highest_scoring_team_score = sleeper_helper.highest_scoring_team_of_week(scoreboards)
+        top_3_teams_result = sleeper_helper.top_3_teams(standings)
+        hs_player, hs_score, hs_team = sleeper_helper.highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+        ls_starter, ls_score, ls_team = sleeper_helper.lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+        hs_benched, hs_benched_score, hs_benched_team = sleeper_helper.highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
+        
+        # Get matchup data with proper formatting
         blowout_match, blowout_diff = sleeper_helper.biggest_blowout_match_of_week(scoreboards)
         close_match, close_diff = sleeper_helper.closest_match_of_week(scoreboards)
-        
+
         # Format blowout match display
         if blowout_match and len(blowout_match) >= 2:
             blowout_winner = blowout_match[0]
@@ -219,7 +227,7 @@ def generate_sleeper_summary(league_id):
             blowout_text = f"{blowout_winner[0]} ({blowout_winner[1]:.1f}) vs {blowout_loser[0]} ({blowout_loser[1]:.1f})"
         else:
             blowout_text = "No matchup data available"
-        
+
         # Format closest match display  
         if close_match and len(close_match) >= 2:
             close_winner = close_match[0]
@@ -227,15 +235,7 @@ def generate_sleeper_summary(league_id):
             close_text = f"{close_winner[0]} ({close_winner[1]:.1f}) vs {close_loser[0]} ({close_loser[1]:.1f})"
         else:
             close_text = "No matchup data available"
-        
-        # Generate individual summary components
-        highest_scoring_team_name, highest_scoring_team_score = sleeper_helper.highest_scoring_team_of_week(scoreboards)
-        top_3_teams_result = sleeper_helper.top_3_teams(standings)
-        hs_player, hs_score, hs_team = sleeper_helper.highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-        ls_starter, ls_score, ls_team = sleeper_helper.lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-        hs_benched, hs_benched_score, hs_benched_team = sleeper_helper.highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
-        blowout_teams, blowout_diff = sleeper_helper.biggest_blowout_match_of_week(scoreboards)
-        close_teams, close_diff = sleeper_helper.closest_match_of_week(scoreboards)
+
         hottest_team, streak = sleeper_helper.team_on_hottest_streak(rosters, user_team_mapping, roster_owner_mapping)
 
         # Check if we got real data
@@ -286,3 +286,4 @@ def generate_sleeper_summary(league_id):
         error_msg = f"Error generating Sleeper summary: {str(e)}"
         LOGGER.error(error_msg)
         return error_msg
+            f"
