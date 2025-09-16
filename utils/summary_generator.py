@@ -59,6 +59,7 @@ Here are your instructions:
 - **Celebrate the Victor:** Praise the top-scoring team and player.
 - **Roast the Losers:** Mock the lowest-scoring players and teams, especially the starters who flopped.
 - **Analyze the Matchups:** Highlight the biggest blowout and the closest nail-biter.
+- **Length:** Keep it under 250 words but make it extremely engaging.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
