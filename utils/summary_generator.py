@@ -35,7 +35,8 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
     Generate streaming fantasy football recap using Google Gemini
     """
     try:
-        model = genai.GenerativeModel('gemini-pro')
+        # Use the correct model name for the stable API
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""You are a fantasy football commentator who will create a weekly recap. Here are your instructions:
 
