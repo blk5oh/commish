@@ -13,18 +13,12 @@ LOGGER = get_logger(__name__)
 
 def moderate_text(client, text):
     try:
-        # Send the moderation request
         response = client.moderations.create(
             input=text,
-            model="text-moderation-latest"  # Use the latest moderation model
+            model="text-moderation-latest"
         )
-
-        # Extract the first result
         result = response.results[0]
-
-        # Check if the content is flagged
         if result.flagged:
-            # Log the flagged categories
             flagged_categories = [
                 category for category, flagged in result.categories.items() if flagged
             ]
@@ -32,48 +26,38 @@ def moderate_text(client, text):
                 "Moderation flagged the following categories: %s",
                 ", ".join(flagged_categories),
             )
-            return False  # Return False if any category is flagged
-        return True  # Content is not flagged, return True
-
+            return False
+        return True
     except Exception as e:
         LOGGER.error("An error occurred during moderation: %s", str(e))
-        return False  # Assume text is inappropriate in case of an error
+        return False
 
 def generate_gpt4_summary_streaming(client, summary, character_choice, trash_talk_level):
-    # Construct the instruction for GPT-4 based on user inputs
     instruction = f"You will be provided a summary below containing the most recent weekly stats for a fantasy football league. \
     Create a weekly recap in the style of {character_choice}. Do not simply repeat every single stat verbatim - be creative while calling out stats and being on theme. You should include trash talk with a level of {trash_talk_level} based on a scale of 1-10 (1 being no trash talk, 10 being excessive hardcore trash talk); feel free to make fun of (or praise) team names and performances, and add a touch of humor related to the chosen character. \
     Keep your summary concise enough (under 800 characters) as to not overwhelm the user with stats but still engaging, funny, thematic, and insightful. You can sprinkle in a few emojis if they are thematic. Only respond in character and do not reply with anything other than your recap. Begin by introducing \
     your character. Here is the provided weekly fantasy summary: {summary}"
 
-    # Create the messages array
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
         {"role": "user", "content": instruction}
     ]
 
     try:
-        # Send the messages to OpenAI's GPT-4 for analysis
         response = client.chat.completions.create(
-            model="gpt-4o-mini",  # Use the appropriate model
+            model="gpt-4o-mini",
             messages=messages,
-            max_tokens=1600,  # Control response length
+            max_tokens=1600,
             stream=True
         )
         
-        # Extract and yield the GPT-4 generated message
         for chunk in response:
-            # Access 'content' directly since 'delta' is an object, not a dictionary
             if hasattr(chunk.choices[0].delta, 'content'):
                 yield chunk.choices[0].delta.content
-
     except Exception as e:
         yield f"Error details: {e}"
 
 def generate_espn_summary(league, cw):
-    """
-    Generate a human-friendly summary for an ESPN league with improved formatting.
-    """
     top_teams = espn_helper.top_three_teams(league)
     top_scorer_week = espn_helper.top_scorer_of_week(league, cw)
     worst_scorer_week = espn_helper.worst_scorer_of_week(league, cw)
@@ -112,29 +96,27 @@ def generate_espn_summary(league, cw):
 
 @st.cache_data(ttl=3600)
 def get_espn_league_summary(league_id, espn2, SWID):
-    # Fetch data from ESPN Fantasy API and compute statistics   
     start_time_league_connect = datetime.datetime.now() 
     league_id = league_id
-    year = helper.get_nfl_season_year(datetime.datetime.now())  # Dynamic year
+    year = helper.get_nfl_season_year(datetime.datetime.now())
     espn_s2 = espn2
     swid = SWID
-    # Initialize league & current week
+    
     try:
         league = League(league_id=league_id, year=year, espn_s2=espn_s2, swid=swid)
     except Exception as e:
         return str(e), "Error occurred during validation"
+    
     end_time_league_connect = datetime.datetime.now()
     league_connect_duration = (end_time_league_connect - start_time_league_connect).total_seconds()
     
-    # Use dynamic week calculation
     cw = helper.get_safest_week_for_recap(datetime.datetime.now())
     
-    # Generate summary
     start_time_summary = datetime.datetime.now()
     summary = generate_espn_summary(league, cw)
     end_time_summary = datetime.datetime.now()
     summary_duration = (end_time_summary - start_time_summary).total_seconds()
-    # Generate debugging information
+    
     debug_info = f"Summary: {summary} ~~~Timings~~~ League Connect Duration: {league_connect_duration} seconds Summary Duration: {summary_duration} seconds Current Week: {cw} Season Year: {year}"
     return summary, debug_info
 
@@ -149,21 +131,17 @@ def get_yahoo_league_summary(league_id, auth_path):
         game_code="nfl"
     )
     LOGGER.info(f"sc: {sc}")
-    # Use dynamic week calculation instead of hardcoded
     week = helper.get_safest_week_for_recap(datetime.datetime.now())
     recap = yahoo_helper.generate_weekly_recap(sc, week=week)
     return recap
 
 @st.cache_data(ttl=3600)
 def generate_sleeper_summary(league_id):
-    """Generates a human-friendly summary for a Sleeper league - only uses completed weeks."""
     league = SleeperLeague(league_id)
     
-    # Use the safest week calculation - guarantees completed scoring
     week = helper.get_safest_week_for_recap(datetime.datetime.now())
     current_nfl_week = helper.get_current_week(datetime.datetime.now())
     
-    # Debug info to understand what's happening
     debug_info = helper.debug_week_selection(datetime.datetime.now())
     
     LOGGER.info(f"Week Selection Debug: {debug_info}")
@@ -175,12 +153,10 @@ def generate_sleeper_summary(league_id):
         matchups = league.get_matchups(week)
         standings = league.get_standings(rosters, users)
 
-        # Check if we actually got matchup data
         if not matchups:
             LOGGER.warning(f"No matchup data returned for week {week}")
             return f"No data available for Week {week}. This week may not have started yet or data isn't available."
 
-        # Check if matchup data has actual scores
         has_real_scores = False
         for matchup in matchups:
             if matchup.get('points', 0) > 0:
@@ -188,13 +164,11 @@ def generate_sleeper_summary(league_id):
                 break
             
         if not has_real_scores:
-            # Try an even earlier week
             safer_week = max(1, week - 1)
             LOGGER.info(f"Week {week} has no scores, trying week {safer_week}")
             matchups = league.get_matchups(safer_week)
-            week = safer_week  # Update week variable for display
+            week = safer_week
 
-        # Load player data directly from the local file
         try:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
             players_file_path = os.path.join(project_root, 'players_data.json')
@@ -209,18 +183,15 @@ def generate_sleeper_summary(league_id):
         roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
         scoreboards = sleeper_helper.calculate_scoreboards(matchups, user_team_mapping, roster_owner_mapping)
 
-        # Generate individual summary components
         highest_scoring_team_name, highest_scoring_team_score = sleeper_helper.highest_scoring_team_of_week(scoreboards)
         top_3_teams_result = sleeper_helper.top_3_teams(standings)
         hs_player, hs_score, hs_team = sleeper_helper.highest_scoring_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
         ls_starter, ls_score, ls_team = sleeper_helper.lowest_scoring_starter_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
         hs_benched, hs_benched_score, hs_benched_team = sleeper_helper.highest_scoring_benched_player_of_week(matchups, players_data, user_team_mapping, roster_owner_mapping)
         
-        # Get matchup data with proper formatting
         blowout_match, blowout_diff = sleeper_helper.biggest_blowout_match_of_week(scoreboards)
         close_match, close_diff = sleeper_helper.closest_match_of_week(scoreboards)
 
-        # Format blowout match display
         if blowout_match and len(blowout_match) >= 2:
             blowout_winner = blowout_match[0]
             blowout_loser = blowout_match[1]
@@ -228,7 +199,6 @@ def generate_sleeper_summary(league_id):
         else:
             blowout_text = "No matchup data available"
 
-        # Format closest match display  
         if close_match and len(close_match) >= 2:
             close_winner = close_match[0]
             close_loser = close_match[1]
@@ -238,7 +208,6 @@ def generate_sleeper_summary(league_id):
 
         hottest_team, streak = sleeper_helper.team_on_hottest_streak(rosters, user_team_mapping, roster_owner_mapping)
 
-        # Check if we got real data
         if hs_score == 0 and ls_score == 0 and highest_scoring_team_score == 0:
             return f"""
             ### No Scoring Data Available
@@ -256,7 +225,6 @@ def generate_sleeper_summary(league_id):
             - Available Weeks: {debug_info.get('available_weeks', [])}
             """
 
-        # Format summary with Markdown for better readability
         summary_parts = [
             f"### Weekly Standouts (Week {week})\n",
             f"**Top Scoring Team:** {highest_scoring_team_name} with **{highest_scoring_team_score:.2f}** points.\n",
@@ -279,11 +247,9 @@ def generate_sleeper_summary(league_id):
         
         summary = "\n".join(summary_parts)
         LOGGER.info(f"Sleeper Summary Generated for Week {week} with real data")
-
         return summary
         
     except Exception as e:
         error_msg = f"Error generating Sleeper summary: {str(e)}"
         LOGGER.error(error_msg)
         return error_msg
-            f"
