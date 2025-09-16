@@ -1,5 +1,5 @@
 import streamlit as st
-from openai import OpenAI
+import google.generativeai as genai
 from streamlit.logger import get_logger
 from utils import summary_generator
 from utils.helper import check_availability
@@ -14,15 +14,9 @@ import shutil
 
 LOGGER = get_logger(__name__)
 
-OPEN_AI_ORG_ID = st.secrets["OPENAI_ORG_ID"]
-OPEN_AI_PROJECT_ID = st.secrets["OPENAI_API_PROJECT_ID"]
-OPENAI_API_KEY = st.secrets["OPENAI_COMMISH_API_KEY"]
-
-client = OpenAI(
-    organization=OPEN_AI_ORG_ID,
-    project=OPEN_AI_PROJECT_ID,
-    api_key=OPENAI_API_KEY
-)
+# Configure Google Gemini
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+genai.configure(api_key=GOOGLE_API_KEY)
 
 st.set_page_config(
     page_title="Commish.ai",
@@ -187,10 +181,10 @@ def main():
                 swid = st.session_state.get('SWID', 'Not provided')
                 espn2 = st.session_state.get('ESPN2_Id', 'Not provided')
 
-                # Moderate the character description
+                # Moderate the character description using simple check
                 progress.text('Validating character...')
                 progress.progress(15)
-                if not summary_generator.moderate_text(client, character_description):
+                if not summary_generator.moderate_text_gemini(character_description):
                     st.error("The character description contains inappropriate content. Please try again.")
                     return
                 
@@ -227,18 +221,18 @@ def main():
                 progress.text('Generating AI summary...')
                 progress.progress(50)
 
-                LOGGER.debug("Initializing GPT Summary Stream...")
+                LOGGER.debug("Initializing Gemini Summary Stream...")
                 try:
-                    gpt4_summary_stream = summary_generator.generate_gpt4_summary_streaming(
-                        client, summary, character_description, trash_talk_level
+                    gemini_summary_stream = summary_generator.generate_gemini_summary_streaming(
+                        summary, character_description, trash_talk_level
                     )
-                    LOGGER.debug(f"Generator object initialized: {gpt4_summary_stream}")
+                    LOGGER.debug(f"Generator object initialized: {gemini_summary_stream}")
                     
                     with st.chat_message("Commish", avatar="🤖"):
                         message_placeholder = st.empty()
                         full_response = ""
                 
-                        for chunk in gpt4_summary_stream:
+                        for chunk in gemini_summary_stream:
                             if chunk is not None:
                                 full_response += chunk
                                 message_placeholder.markdown(full_response + "▌")
@@ -246,13 +240,13 @@ def main():
                             
                         message_placeholder.markdown(full_response)
                 
-                    LOGGER.debug("GPT Stream completed!")
+                    LOGGER.debug("Gemini Stream completed!")
                     
                     st.markdown("**Click the copy icon** 📋 below in top right corner to copy your summary and paste it wherever you see fit!")
                     st.code(full_response, language="")
                 
                 except Exception as e:
-                    LOGGER.error(f"An error occurred while streaming GPT response: {str(e)}")
+                    LOGGER.error(f"An error occurred while streaming Gemini response: {str(e)}")
                     st.error(f"An error occurred: {str(e)}")
                     LOGGER.exception(e)
                     st.text(traceback.format_exc())
