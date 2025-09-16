@@ -30,7 +30,7 @@ Here are your instructions:
 
 **TRASH TALK LEVEL:** {trash_talk_level}/10. 
 - A 1 should be friendly and light-hearted.
-- A 10 should be absolutely brutal, savage, and can include explicit language.
+- A 10 should be absolutely brutal and savage.
 
 **TONE & STYLE:**
 - **Be Clever:** Use witty wordplay, metaphors, and sharp analysis. Do not just list stats.
