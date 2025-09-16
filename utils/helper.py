@@ -7,11 +7,12 @@ def check_availability():
     current_hour = now_est.hour
     current_day = now_est.weekday()
 
+    # Availability window is from Tuesday 4am EST to Thursday 7pm EST
     if current_day == 1 and current_hour >= 4:  # Tuesday 4am onwards
         return True, now_est.strftime("%A")
-    elif 1 < current_day < 4:  # All day Wednesday and Thursday until 7pm
+    elif current_day == 2:  # All day Wednesday
         return True, now_est.strftime("%A")
-    elif current_day == 4 and current_hour < 19:  # Thursday until 7pm
+    elif current_day == 3 and current_hour < 19: # Thursday until 7pm EST
         return True, now_est.strftime("%A")
     else:
         return False, now_est.strftime("%A")
@@ -20,115 +21,80 @@ def get_nfl_season_year(current_date):
     """
     Determines the NFL season year based on the current date.
     """
-    if current_date.month >= 9:  # September or later = current year's season
+    if current_date.month >= 9:  # September or later is the current year's season
         return current_date.year
-    else:  # January through August = previous year's season
+    else:  # Before September is the previous year's season
         return current_date.year - 1
 
 def get_nfl_week_1_start(season_year):
     """
-    Calculates the start of NFL Week 1 for a given season.
-    Uses the first Thursday of September as approximation.
+    Calculates the fantasy start of NFL Week 1 (the Tuesday of the week of the first game).
     """
     first_of_sept = datetime(season_year, 9, 1)
-    
-    # Find first Thursday (weekday 3)
-    days_until_thursday = (3 - first_of_sept.weekday()) % 7
-    if days_until_thursday == 0 and first_of_sept.weekday() != 3:
-        days_until_thursday = 7
-    
+    # Find the first Thursday of September
+    days_until_thursday = (3 - first_of_sept.weekday() + 7) % 7
     first_thursday = first_of_sept + timedelta(days=days_until_thursday)
     
-    # Use the preceding Wednesday as the "start" of Week 1 for scoring purposes
-    week_1_start = first_thursday - timedelta(days=1)
+    # --- FIX: The start of the fantasy week is the Tuesday before the first Thursday game ---
+    # Tuesday is weekday 1.
+    days_from_thursday_to_tuesday = first_thursday.weekday() - 1
+    week_1_start_date = first_thursday - timedelta(days=days_from_thursday_to_tuesday)
     
-    return week_1_start
-
-def generate_nfl_schedule(season_year):
-    """
-    Generates the complete NFL schedule for a given season.
-    """
-    week_1_start = get_nfl_week_1_start(season_year)
-    
-    schedule = {}
-    current_date = week_1_start
-    
-    # Regular season: Weeks 1-18
-    for week in range(1, 19):
-        schedule[current_date] = week
-        current_date += timedelta(days=7)
-    
-    return schedule
+    return week_1_start_date
 
 def get_current_week(current_date):
     """
-    Determines what NFL week we're currently in (not necessarily completed).
+    Calculates the current NFL fantasy week based on the season start date.
     """
     season_year = get_nfl_season_year(current_date)
-    schedule = generate_nfl_schedule(season_year)
+    week_1_start = get_nfl_week_1_start(season_year)
     
-    sorted_dates = sorted(schedule.keys(), reverse=True)
+    # Calculate the number of days that have passed since the start of Week 1
+    days_since_week_1 = (current_date.replace(tzinfo=None) - week_1_start).days
     
-    for week_start_date in sorted_dates:
-        if current_date >= week_start_date:
-            return schedule[week_start_date]
+    # Calculate the current week (1-indexed)
+    current_week = (days_since_week_1 // 7) + 1
     
-    return 1
+    return max(1, current_week)
 
 def get_last_completed_week(current_date):
     """
-    Gets the most recent week that is DEFINITELY completed with finalized scoring.
-    Less conservative - assumes previous week is completed by Wednesday.
+    Determines the most recently completed week based on the current date.
+    A week is considered "complete" after Monday Night Football, so on Tuesday.
     """
-    est = pytz.timezone('US/Eastern')
-    current_est = current_date.astimezone(est) if current_date.tzinfo else est.localize(current_date)
-    
     current_week = get_current_week(current_date)
-    
-    # If we're in Week N and it's Wednesday or later, Week N-1 should be completed
-    # If we're in Week N and it's Tuesday 6 AM or later, Week N-1 should be completed
-    # If we're early in Week N (Mon/early Tue), be more cautious
-    
-    if current_est.weekday() >= 2:  # Wednesday or later
-        return max(1, current_week - 1)
-    elif current_est.weekday() == 1 and current_est.hour >= 6:  # Tuesday 6 AM or later
-        return max(1, current_week - 1)
-    elif current_est.weekday() == 1:  # Tuesday before 6 AM
-        return max(1, current_week - 1)  # Still try previous week
-    else:
-        # Monday - be more conservative
-        return max(1, current_week - 1)
+    # Tuesday (weekday 1) is the start of the new fantasy week.
+    # Therefore, if it's Tuesday or later, the "current week" has begun,
+    # and the "last completed week" is the week before.
+    if current_date.weekday() >= 1: # 1 is Tuesday
+        return current_week - 1
+    else: # If it's Sunday or Monday, we are still in the current week.
+        return current_week - 2
 
 def get_available_weeks_for_recap(current_date):
     """
-    Returns a list of weeks that definitely have completed, finalized scoring.
-    Most conservative approach.
+    Gets a list of all fully completed weeks available for a recap.
     """
     last_completed = get_last_completed_week(current_date)
-    
     if last_completed < 1:
         return []
     
-    # Return all weeks from 1 up to the last completed week
     return list(range(1, last_completed + 1))
 
 def get_safest_week_for_recap(current_date):
     """
-    Returns the safest week to use for recap generation.
-    Guarantees the week has completed scoring.
+    Returns the most recent, fully completed week to generate a recap for.
     """
     available_weeks = get_available_weeks_for_recap(current_date)
-    
     if not available_weeks:
-        return 1  # Fallback to Week 1 if nothing is available
+        return 1  # Fallback to Week 1 if no weeks are fully complete yet
     
-    # Return the most recent completed week
+    # Return the latest week in the list of available weeks
     return available_weeks[-1]
 
-# For debugging - shows what week would be selected
 def debug_week_selection(current_date):
     """
-    Debug function to show week selection logic.
+    Debug function to show the output of all date-related helper functions.
     """
     current_week = get_current_week(current_date)
     completed_week = get_last_completed_week(current_date)
@@ -144,6 +110,5 @@ def debug_week_selection(current_date):
         'last_completed_week': completed_week,
         'safest_week_for_recap': safest_week,
         'available_weeks': available_weeks,
-        'day_of_week': current_est.strftime('%A'),
-        'reasoning': f"Using week {safest_week} because it's guaranteed to have final scores"
+        'week_1_start_date': get_nfl_week_1_start(get_nfl_season_year(current_date)).strftime('%Y-%m-%d')
     }
