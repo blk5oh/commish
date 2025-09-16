@@ -5,57 +5,67 @@ from espn_api.football import League
 from yfpy.query import YahooFantasySportsQuery
 from sleeper_wrapper import League as SleeperLeague
 from utils import espn_helper, yahoo_helper, sleeper_helper, helper
-from openai import OpenAI
+import google.generativeai as genai
 import datetime
 from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
-def moderate_text(client, text):
+def moderate_text_gemini(text):
+    """
+    Simple content moderation using basic checks.
+    You could enhance this with Google's safety settings if needed.
+    """
     try:
-        response = client.moderations.create(
-            input=text,
-            model="text-moderation-latest"
-        )
-        result = response.results[0]
-        if result.flagged:
-            flagged_categories = [
-                category for category, flagged in result.categories.items() if flagged
-            ]
-            LOGGER.warning(
-                "Moderation flagged the following categories: %s",
-                ", ".join(flagged_categories),
-            )
-            return False
+        # Basic inappropriate content check
+        inappropriate_words = ['hate', 'violence', 'explicit', 'nsfw']
+        text_lower = text.lower()
+        
+        for word in inappropriate_words:
+            if word in text_lower:
+                LOGGER.warning(f"Content moderation flagged word: {word}")
+                return False
         return True
     except Exception as e:
         LOGGER.error("An error occurred during moderation: %s", str(e))
         return False
 
-def generate_gpt4_summary_streaming(client, summary, character_choice, trash_talk_level):
-    instruction = f"You will be provided a summary below containing the most recent weekly stats for a fantasy football league. \
-    Create a weekly recap in the style of {character_choice}. Do not simply repeat every single stat verbatim - be creative while calling out stats and being on theme. You should include trash talk with a level of {trash_talk_level} based on a scale of 1-10 (1 being no trash talk, 10 being excessive hardcore trash talk); feel free to make fun of (or praise) team names and performances, and add a touch of humor related to the chosen character. \
-    Keep your summary concise enough (under 800 characters) as to not overwhelm the user with stats but still engaging, funny, thematic, and insightful. You can sprinkle in a few emojis if they are thematic. Only respond in character and do not reply with anything other than your recap. Begin by introducing \
-    your character. Here is the provided weekly fantasy summary: {summary}"
-
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": instruction}
-    ]
-
+def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level):
+    """
+    Generate streaming fantasy football recap using Google Gemini
+    """
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=messages,
-            max_tokens=1600,
-            stream=True
+        model = genai.GenerativeModel('gemini-pro')
+        
+        prompt = f"""You are a fantasy football commentator who will create a weekly recap. Here are your instructions:
+
+PERSONA: Adopt the voice and style of {character_choice}
+TRASH TALK LEVEL: {trash_talk_level}/10 (1=friendly, 10=savage)
+TONE: Be creative, entertaining, and stay in character
+LENGTH: Keep under 800 words but make it engaging
+
+FANTASY DATA TO ANALYZE:
+{summary}
+
+Your task: Create a witty, character-appropriate fantasy football recap that highlights the key performances, makes fun of poor performances (according to your trash talk level), and celebrates great plays. Include some personality and humor that fits {character_choice}.
+
+Start by introducing yourself as {character_choice}, then dive into the recap. Make it entertaining!"""
+        
+        response = model.generate_content(
+            prompt,
+            stream=True,
+            generation_config=genai.types.GenerationConfig(
+                temperature=0.8,  # More creative
+                max_output_tokens=1200,
+            )
         )
         
         for chunk in response:
-            if hasattr(chunk.choices[0].delta, 'content'):
-                yield chunk.choices[0].delta.content
+            if chunk.text:
+                yield chunk.text
+                
     except Exception as e:
-        yield f"Error details: {e}"
+        yield f"Error generating recap: {str(e)}"
 
 def generate_espn_summary(league, cw):
     top_teams = espn_helper.top_three_teams(league)
