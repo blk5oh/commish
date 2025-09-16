@@ -9,6 +9,22 @@ from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
+def moderate_text_gemini(text):
+    """
+    Simple content moderation using basic checks.
+    """
+    try:
+        inappropriate_words = ['hate', 'violence', 'explicit', 'nsfw']
+        text_lower = text.lower()
+        for word in inappropriate_words:
+            if word in text_lower:
+                LOGGER.warning(f"Content moderation flagged word: {word}")
+                return False
+        return True
+    except Exception as e:
+        LOGGER.error("An error occurred during moderation: %s", str(e))
+        return False
+
 def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level, is_best_ball=False):
     """
     Generate streaming fantasy football recap using Google Gemini with all enhancements.
@@ -30,7 +46,7 @@ Here are your instructions:
 
 **TRASH TALK LEVEL:** {trash_talk_level}/10. 
 - A 1 should be friendly and light-hearted.
-- A 10 should be absolutely brutal, condescending, and savage.
+- A 10 should be absolutely brutal, savage, and can include explicit language.
 
 **TONE & STYLE:**
 - **Be Clever:** Use witty wordplay, metaphors, and sharp analysis. Do not just list stats.
@@ -53,10 +69,7 @@ Your task: Create a witty, character-appropriate fantasy football recap. Start b
         response = model.generate_content(
             prompt,
             stream=True,
-            generation_config=genai.types.GenerationConfig(
-                temperature=0.9,
-                max_output_tokens=1000,
-            )
+            generation_config=genai.types.GenerationConfig(temperature=0.9, max_output_tokens=1000)
         )
         
         for chunk in response:
@@ -71,12 +84,7 @@ def generate_sleeper_summary(league_id):
     """Generates a human-friendly summary for a Sleeper league, now aware of Best Ball leagues."""
     league = SleeperLeague(league_id)
     week = helper.get_safest_week_for_recap(datetime.datetime.now())
-    current_nfl_week = helper.get_current_week(datetime.datetime.now())
-    debug_info = helper.debug_week_selection(datetime.datetime.now())
     
-    LOGGER.info(f"Week Selection Debug: {debug_info}")
-    LOGGER.info(f"Current NFL week: {current_nfl_week}, Using completed week: {week} for data")
-
     try:
         league_data = league.get_league()
         settings = league_data.get('settings', {})
@@ -88,15 +96,7 @@ def generate_sleeper_summary(league_id):
         standings = league.get_standings(rosters, users)
 
         if not matchups:
-            return f"No data available for Week {week}. This week may not have started yet."
-
-        has_real_scores = any(matchup.get('points', 0) > 0 for matchup in matchups)
-            
-        if not has_real_scores:
-            safer_week = max(1, week - 1)
-            LOGGER.info(f"Week {week} has no scores, trying week {safer_week}")
-            matchups = league.get_matchups(safer_week)
-            week = safer_week
+            return f"No data available for Week {week}. This week may not have started yet.", is_best_ball
 
         try:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,7 +105,7 @@ def generate_sleeper_summary(league_id):
                 players_data = json.load(f)
         except FileNotFoundError:
             st.error(f"Player data file ('players_data.json') not found at: {players_file_path}.")
-            return "Player data not found."
+            return "Player data not found.", is_best_ball
 
         user_team_mapping = league.map_users_to_team_name(users)
         roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
