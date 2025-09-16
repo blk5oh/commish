@@ -46,20 +46,20 @@ Here are your instructions:
 
 **TRASH TALK LEVEL:** {trash_talk_level}/10. 
 - A 1 should be friendly and light-hearted.
-- A 10 should be absolutely brutal and savage, holding nothing back.
+- A 10 should be absolutely brutal, savage, and can include explicit language.
 
 **TONE & STYLE:**
-- **Be Clever:** Use witty wordplay, metaphors, and sharp analysis. Don't just list stats.
-- **Use Puns:** Make clever puns based on player names, team names, or owner names.
+- **Be Clever:** Use witty wordplay, metaphors, and sharp analysis. Do not just list stats.
+- **Be Original:** Do not reuse phrases from the provided data summary.
+- **Use Puns & Pop Culture:** Make clever puns based on player/team names and weave in timely pop culture references.
 - **Add Emojis:** Sprinkle in thematic emojis to add flair and personality. 
-- **Be Entertaining:** The goal is to create a recap that is so good, the league members will be talking about it all week.
+- **Be Concise:** Keep the entire summary under 250 words.
 
 **SPECIFIC INSTRUCTIONS:**
 - **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥
 - **Celebrate the Victor:** Praise the top-scoring team and player.
 - **Roast the Losers:** Mock the lowest-scoring players and teams, especially the starters who flopped.
 - **Analyze the Matchups:** Highlight the biggest blowout and the closest nail-biter.
-- **Length:** Keep it under 200 words but make it extremely engaging.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
@@ -70,8 +70,8 @@ Your task: Create a witty, character-appropriate fantasy football recap. Start b
             prompt,
             stream=True,
             generation_config=genai.types.GenerationConfig(
-                temperature=0.85,  # Increased for more creativity
-                max_output_tokens=1200,
+                temperature=0.9,  # Slightly increased for more creativity
+                max_output_tokens=1000,
             )
         )
         
@@ -82,6 +82,8 @@ Your task: Create a witty, character-appropriate fantasy football recap. Start b
     except Exception as e:
         yield f"Error generating recap: {str(e)}"
 
+# (The rest of your file remains unchanged)
+# ...
 @st.cache_data(ttl=3600)
 def generate_sleeper_summary(league_id):
     """Generates a human-friendly summary for a Sleeper league - only uses completed weeks."""
