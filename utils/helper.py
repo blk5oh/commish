@@ -78,36 +78,26 @@ def get_current_week(current_date):
 def get_last_completed_week(current_date):
     """
     Gets the most recent week that is DEFINITELY completed with finalized scoring.
-    Very conservative approach - only returns a week if we're certain it's done.
+    Less conservative - assumes previous week is completed by Wednesday.
     """
     est = pytz.timezone('US/Eastern')
     current_est = current_date.astimezone(est) if current_date.tzinfo else est.localize(current_date)
     
     current_week = get_current_week(current_date)
     
-    # NFL games typically:
-    # - Thursday Night Football (week starts)
-    # - Sunday games
-    # - Monday Night Football (week ends)
-    # - Scores finalized by Tuesday 6 AM EST
-    
-    # Only consider a week "completed" if we're at least Tuesday 6 AM after it ended
-    # This means we need to be in the following week AND it's Tuesday 6 AM or later
-    
-    # If we're in Week N, then Week N-1 is completed only if:
-    # 1. It's Tuesday 6 AM or later in Week N, OR
-    # 2. It's Wednesday or later in Week N
+    # If we're in Week N and it's Wednesday or later, Week N-1 should be completed
+    # If we're in Week N and it's Tuesday 6 AM or later, Week N-1 should be completed
+    # If we're early in Week N (Mon/early Tue), be more cautious
     
     if current_est.weekday() >= 2:  # Wednesday or later
-        # Definitely safe to use previous week
         return max(1, current_week - 1)
     elif current_est.weekday() == 1 and current_est.hour >= 6:  # Tuesday 6 AM or later
-        # Should be safe to use previous week
         return max(1, current_week - 1)
+    elif current_est.weekday() == 1:  # Tuesday before 6 AM
+        return max(1, current_week - 1)  # Still try previous week
     else:
-        # Monday or early Tuesday - be extra conservative
-        # Use the week before the previous week to be absolutely sure
-        return max(1, current_week - 2)
+        # Monday - be more conservative
+        return max(1, current_week - 1)
 
 def get_available_weeks_for_recap(current_date):
     """
