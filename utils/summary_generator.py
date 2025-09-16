@@ -56,7 +56,7 @@ Here are your instructions:
 - **Be Concise:** Keep the entire summary under 250 words.
 
 **SPECIFIC INSTRUCTIONS:**
-- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥
+- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench.
 - **Celebrate the Victor:** Praise the top-scoring team and player.
 - **Roast the Losers:** Mock the lowest-scoring players and teams, especially the starters who flopped.
 - **Analyze the Matchups:** Highlight the biggest blowout and the closest nail-biter.
