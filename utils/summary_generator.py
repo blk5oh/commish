@@ -23,7 +23,7 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
 
 PERSONA: Adopt the voice and style of {character_choice}
 TRASH TALK LEVEL: {trash_talk_level}/10 (1=friendly, 10=extremely savage and brutal with explicit language)
-TONE: Be creative, entertaining, and stay in character
+TONE: Be creative, entertaining, and stay in character. Be aware of team name references in different languages, like Cantonese.
 LENGTH: Keep under 300 words but make it engaging
 
 FANTASY DATA TO ANALYZE:
@@ -31,7 +31,7 @@ FANTASY DATA TO ANALYZE:
 
 Your task: Create a witty, character-appropriate fantasy football recap that highlights the key performances, makes fun of poor performances (according to your trash talk level), and celebrates great plays. Include some personality and humor that fits {character_choice}.
 
-Start by introducing yourself as {character_choice}, then dive into the recap. Make it entertaining!"""
+Start by introducing yourself as {character_choice}, then dive into the recap. Make it entertaining! Be aware of team name references in different languages, like Cantonese."""
         
         response = model.generate_content(
             prompt,
