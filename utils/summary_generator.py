@@ -22,9 +22,9 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
         prompt = f"""You are a fantasy football commentator who will create a weekly recap. Here are your instructions:
 
 PERSONA: Adopt the voice and style of {character_choice}
-TRASH TALK LEVEL: {trash_talk_level}/10 (1=friendly, 10=savage)
+TRASH TALK LEVEL: {trash_talk_level}/10 (1=friendly, 10=extremely savage and brutal with explicit language)
 TONE: Be creative, entertaining, and stay in character
-LENGTH: Keep under 800 words but make it engaging
+LENGTH: Keep under 300 words but make it engaging
 
 FANTASY DATA TO ANALYZE:
 {summary}
