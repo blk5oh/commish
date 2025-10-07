@@ -5,6 +5,12 @@ from utils import summary_generator
 from utils.helper import check_availability
 import traceback
 import os
+import shutil
+import tempfile
+import time
+import json
+from requests.auth import HTTPBasicAuth
+import requests
 
 LOGGER = get_logger(__name__)
 
@@ -35,15 +41,13 @@ def main():
             st.success(f"Today is {today}. The most recent week is completed and a recap is available.")
         else:
             st.warning("Recaps are best generated between Tuesday 4am EST and Thursday 7pm EST.")
-        league_type = st.selectbox("Select League Type", ["Select", "ESPN", "Yahoo", "Sleeper"], key='league_type')
+        league_type = st.selectbox("Select League Type", ["Select", "Sleeper"], key='league_type')
 
     if league_type != "Select":
         with st.sidebar.form(key='my_form'):
             if league_type == "Sleeper":
                 st.text_input("LeagueID", key='LeagueID')
-            else:
-                st.text_input("LeagueID", key='LeagueID') # Placeholder for other types
-
+            
             st.text_input("Character Description", key='Character Description', placeholder="Macho Man Randy Savage")
             st.slider("Trash Talk Level", 1, 10, key='Trash Talk Level', value=5)
             submit_button = st.form_submit_button(label='🤖 Generate AI Summary')
@@ -61,13 +65,6 @@ def main():
                 character_description = st.session_state['Character Description']
                 trash_talk_level = st.session_state['Trash Talk Level']
 
-                progress.text('Validating character...')
-                progress.progress(15)
-                # --- FIX: Pass trash_talk_level to the moderation function ---
-                if not summary_generator.moderate_text_gemini(character_description, trash_talk_level):
-                    st.error("The character description contains inappropriate content. Please try again.")
-                    return
-                
                 progress.text('Fetching league summary...')
                 progress.progress(30)
                 
