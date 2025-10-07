@@ -4,6 +4,7 @@ import json
 from sleeper_wrapper import League as SleeperLeague
 from utils import sleeper_helper, helper
 import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import datetime
 from streamlit.logger import get_logger
 
@@ -34,9 +35,20 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
     Generate streaming fantasy football recap using Google Gemini with all enhancements.
     """
     try:
-        # --- FIX: Use the 'gemini-pro' model for broader compatibility ---
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
+        # --- FIX: Define safety settings to conditionally allow explicit content ---
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        }
+
+        if trash_talk_level == 10:
+            # If trash talk is maxed out, lower the block threshold for sexually explicit content.
+            safety_settings[HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT] = HarmBlockThreshold.BLOCK_NONE
+
         bench_player_instruction = ""
         if not is_best_ball:
             bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
@@ -74,7 +86,8 @@ Your task: Create a witty, character-appropriate fantasy football recap. Start b
         response = model.generate_content(
             prompt,
             stream=True,
-            generation_config=genai.types.GenerationConfig(temperature=0.9, max_output_tokens=1000)
+            generation_config=genai.types.GenerationConfig(temperature=0.9, max_output_tokens=1000),
+            safety_settings=safety_settings
         )
         
         for chunk in response:
