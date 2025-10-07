@@ -41,9 +41,8 @@ def main():
         with st.sidebar.form(key='my_form'):
             if league_type == "Sleeper":
                 st.text_input("LeagueID", key='LeagueID')
-            # Add placeholders for other league types if needed
             else:
-                st.text_input("LeagueID", key='LeagueID')
+                st.text_input("LeagueID", key='LeagueID') # Placeholder for other types
 
             st.text_input("Character Description", key='Character Description', placeholder="Macho Man Randy Savage")
             st.slider("Trash Talk Level", 1, 10, key='Trash Talk Level', value=5)
@@ -64,17 +63,18 @@ def main():
 
                 progress.text('Validating character...')
                 progress.progress(15)
-                if not summary_generator.moderate_text_gemini(character_description):
+                # --- FIX: Pass trash_talk_level to the moderation function ---
+                if not summary_generator.moderate_text_gemini(character_description, trash_talk_level):
                     st.error("The character description contains inappropriate content. Please try again.")
                     return
                 
                 progress.text('Fetching league summary...')
                 progress.progress(30)
                 
-                summary, is_best_ball = "", False
+                summary, is_best_ball, league_type_name = "", False, "redraft"
                 
                 if league_type == "Sleeper":
-                    summary, is_best_ball = summary_generator.generate_sleeper_summary(league_id)
+                    summary, is_best_ball, league_type_name = summary_generator.generate_sleeper_summary(league_id)
                 else:
                     st.error(f"{league_type} league type is not fully supported in this version.")
                     return
@@ -86,7 +86,7 @@ def main():
                 progress.progress(50)
 
                 gemini_summary_stream = summary_generator.generate_gemini_summary_streaming(
-                    summary, character_description, trash_talk_level, is_best_ball
+                    summary, character_description, trash_talk_level, is_best_ball, league_type_name
                 )
                 
                 with st.chat_message("Commish", avatar="🤖"):
