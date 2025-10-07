@@ -9,12 +9,16 @@ from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
-def moderate_text_gemini(text):
+def moderate_text_gemini(text, trash_talk_level=5):
     """
-    Simple content moderation using basic checks.
+    Simple content moderation that allows 'explicit' if trash_talk_level is 10.
     """
     try:
-        inappropriate_words = ['hate', 'violence', 'explicit', 'nsfw']
+        inappropriate_words = ['hate', 'violence', 'nsfw']
+        # --- FIX: Only add 'explicit' to the naughty list if trash talk is not maxed out ---
+        if trash_talk_level < 10:
+            inappropriate_words.append('explicit')
+
         text_lower = text.lower()
         for word in inappropriate_words:
             if word in text_lower:
@@ -25,12 +29,12 @@ def moderate_text_gemini(text):
         LOGGER.error("An error occurred during moderation: %s", str(e))
         return False
 
-def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level, is_best_ball=False):
+def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level, is_best_ball=False, league_type='redraft'):
     """
     Generate streaming fantasy football recap using Google Gemini with all enhancements.
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        model = genai.GenerativeModel('gemini-pro')
         
         bench_player_instruction = ""
         if not is_best_ball:
@@ -38,7 +42,7 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
         else:
             bench_player_instruction = """- **This is a Best Ball league, so there's no need to analyze bench players.**"""
 
-        prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap that is clever, insightful, and hilarious.
+        prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league that is clever, insightful, and hilarious.
 
 Here are your instructions:
 
@@ -89,6 +93,7 @@ def generate_sleeper_summary(league_id):
         league_data = league.get_league()
         settings = league_data.get('settings', {})
         is_best_ball = settings.get('best_ball', 0) == 1
+        league_type_name = league_data.get('type', 'redraft')
         
         rosters = league.get_rosters()
         users = league.get_users()
@@ -96,7 +101,7 @@ def generate_sleeper_summary(league_id):
         standings = league.get_standings(rosters, users)
 
         if not matchups:
-            return f"No data available for Week {week}. This week may not have started yet.", is_best_ball
+            return f"No data available for Week {week}. This week may not have started yet.", is_best_ball, league_type_name
 
         try:
             project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -105,7 +110,7 @@ def generate_sleeper_summary(league_id):
                 players_data = json.load(f)
         except FileNotFoundError:
             st.error(f"Player data file ('players_data.json') not found at: {players_file_path}.")
-            return "Player data not found.", is_best_ball
+            return "Player data not found.", is_best_ball, league_type_name
 
         user_team_mapping = league.map_users_to_team_name(users)
         roster_owner_mapping = league.map_rosterid_to_ownerid(rosters)
@@ -159,9 +164,9 @@ def generate_sleeper_summary(league_id):
         summary = "".join(summary_parts)
         LOGGER.info(f"Sleeper Summary Generated for Week {week} with real data")
 
-        return summary, is_best_ball
+        return summary, is_best_ball, league_type_name
         
     except Exception as e:
         error_msg = f"Error generating Sleeper summary: {str(e)}"
         LOGGER.error(error_msg, exc_info=True)
-        return error_msg, False
+        return error_msg, False, 'redraft'
