@@ -35,7 +35,7 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
     """
     try:
         # --- FIX: Use the 'gemini-pro' model for broader compatibility ---
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         bench_player_instruction = ""
         if not is_best_ball:
