@@ -10,31 +10,12 @@ from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
-def moderate_text_gemini(text, trash_talk_level=5):
-    """
-    Simple content moderation that allows 'explicit' if trash_talk_level is 10.
-    """
-    try:
-        inappropriate_words = ['hate', 'violence', 'nsfw']
-        # Only add 'explicit' to the naughty list if trash talk is not maxed out
-        if trash_talk_level < 10:
-            inappropriate_words.append('explicit')
-
-        text_lower = text.lower()
-        for word in inappropriate_words:
-            if word in text_lower:
-                LOGGER.warning(f"Content moderation flagged word: {word}")
-                return False
-        return True
-    except Exception as e:
-        LOGGER.error("An error occurred during moderation: %s", str(e))
-        return False
-
 def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level, is_best_ball=False, league_type='redraft'):
     """
     Generate streaming fantasy football recap using Google Gemini with all enhancements.
     """
     try:
+        # --- FIX: Use the 'gemini-2.0-flash-exp' model as specified ---
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         # --- FIX: Define safety settings to conditionally allow explicit content ---
@@ -46,7 +27,8 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
         }
 
         if trash_talk_level == 10:
-            # If trash talk is maxed out, lower the block threshold for sexually explicit content.
+            # If trash talk is maxed out, lower the block thresholds.
+            safety_settings[HarmCategory.HARM_CATEGORY_HARASSMENT] = HarmBlockThreshold.BLOCK_NONE
             safety_settings[HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT] = HarmBlockThreshold.BLOCK_NONE
 
         bench_player_instruction = ""
