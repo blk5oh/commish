@@ -15,7 +15,7 @@ def moderate_text_gemini(text, trash_talk_level=5):
     """
     try:
         inappropriate_words = ['hate', 'violence', 'nsfw']
-        # --- FIX: Only add 'explicit' to the naughty list if trash talk is not maxed out ---
+        # Only add 'explicit' to the naughty list if trash talk is not maxed out
         if trash_talk_level < 10:
             inappropriate_words.append('explicit')
 
@@ -34,6 +34,7 @@ def generate_gemini_summary_streaming(summary, character_choice, trash_talk_leve
     Generate streaming fantasy football recap using Google Gemini with all enhancements.
     """
     try:
+        # --- FIX: Use the 'gemini-pro' model for broader compatibility ---
         model = genai.GenerativeModel('gemini-pro')
         
         bench_player_instruction = ""
