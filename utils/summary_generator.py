@@ -1,23 +1,37 @@
 import streamlit as st
 import os
 import json
-from espn_api.football import League
-from yfpy.query import YahooFantasySportsQuery
 from sleeper_wrapper import League as SleeperLeague
-from utils import espn_helper, yahoo_helper, sleeper_helper, helper
+from utils import sleeper_helper, helper
 import google.generativeai as genai
 import datetime
 from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
-def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level):
+def moderate_text_gemini(text):
     """
-    Generate streaming fantasy football recap using Google Gemini 2.5
+    Simple content moderation using basic checks.
     """
     try:
-        # Use Gemini 2.5 Flash - the latest model
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        inappropriate_words = ['hate', 'violence', 'explicit', 'nsfw']
+        text_lower = text.lower()
+        for word in inappropriate_words:
+            if word in text_lower:
+                LOGGER.warning(f"Content moderation flagged word: {word}")
+                return False
+        return True
+    except Exception as e:
+        LOGGER.error("An error occurred during moderation: %s", str(e))
+        return False
+
+def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level, is_best_ball=False):
+    """
+    Generate streaming fantasy football recap using Google Gemini with all enhancements.
+    """
+    try:
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
         bench_player_instruction = ""
         if not is_best_ball:
             bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
