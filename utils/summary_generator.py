@@ -35,7 +35,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     Generate streaming fantasy football recap using Google Gemini, handling one or two characters.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.0')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
         safety_settings = {
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
