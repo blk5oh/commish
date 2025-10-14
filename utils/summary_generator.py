@@ -16,7 +16,6 @@ def moderate_text_gemini(text, trash_talk_level=5):
     """
     try:
         inappropriate_words = ['hate', 'violence', 'nsfw']
-        # Only add 'explicit' to the naughty list if trash talk is not maxed out
         if trash_talk_level < 10:
             inappropriate_words.append('explicit')
 
@@ -35,6 +34,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     Generate streaming fantasy football recap using Google Gemini, handling one or two characters.
     """
     try:
+        # --- FIX: Use the 'gemini-2.0-flash-exp' model as specified ---
         model = genai.GenerativeModel('gemini-2.0-flash-exp')
         
         safety_settings = {
@@ -119,7 +119,6 @@ Your task: Create a witty, character-appropriate fantasy football recap. Start b
                 
     except Exception as e:
         yield f"Error generating recap: {str(e)}"
-
 
 @st.cache_data(ttl=3600)
 def generate_sleeper_summary(league_id):
@@ -208,5 +207,3 @@ def generate_sleeper_summary(league_id):
         error_msg = f"Error generating Sleeper summary: {str(e)}"
         LOGGER.error(error_msg, exc_info=True)
         return error_msg, False, 'redraft'
-
-# (The rest of your file with ESPN/Yahoo functions would go here)
