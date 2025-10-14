@@ -10,60 +10,85 @@ from streamlit.logger import get_logger
 
 LOGGER = get_logger(__name__)
 
-def generate_gemini_summary_streaming(summary, character_choice, trash_talk_level, is_best_ball=False, league_type='redraft'):
+def moderate_text_gemini(text, trash_talk_level=5):
+    # ... (this function remains the same) ...
+
+def generate_gemini_summary_streaming(summary, character1, character2, trash_talk_level, is_best_ball=False, league_type='redraft'):
     """
-    Generate streaming fantasy football recap using Google Gemini with all enhancements.
+    Generate streaming fantasy football recap using Google Gemini, handling one or two characters.
     """
     try:
-        # --- FIX: Use the 'gemini-2.0-flash-exp' model as specified ---
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-1.5-flash-latest')
         
-        # --- FIX: Define safety settings to conditionally allow explicit content ---
         safety_settings = {
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
         }
-
         if trash_talk_level == 10:
-            # If trash talk is maxed out, lower the block thresholds.
             safety_settings[HarmCategory.HARM_CATEGORY_HARASSMENT] = HarmBlockThreshold.BLOCK_NONE
             safety_settings[HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT] = HarmBlockThreshold.BLOCK_NONE
 
-        bench_player_instruction = ""
-        if not is_best_ball:
-            bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
-        else:
-            bench_player_instruction = """- **This is a Best Ball league, so there's no need to analyze bench players.**"""
-
-        prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league that is clever, insightful, and hilarious.
+        # --- FIX: Dynamically create the prompt based on whether a second character is present ---
+        if character2:
+            # BANTER PROMPT
+            prompt = f"""You are a scriptwriter for a fantasy football recap show. Your task is to write a script for a playful banter and debate between two co-hosts: {character1} and {character2}.
 
 Here are your instructions:
 
-**PERSONA:** Adopt the voice and style of {character_choice}. Be completely committed to this persona.
+**FORMAT:**
+- Write the script as a dialogue. For example:
+  {character1}: [dialogue]
+  {character2}: [dialogue]
+- The hosts should interrupt, react to, and build upon each other's points while still delivering the weekly recap.
 
-**TRASH TALK LEVEL:** {trash_talk_level}/10. 
-- A 1 should be friendly and light-hearted.
-- A 10 should be absolutely brutal, savage, and can include explicit language.
+**PERSONAS:**
+- {character1} must speak and act exactly like their real-life persona.
+- {character2} must also be perfectly in character.
+- Their personalities should clash or combine in a funny and engaging way.
+
+**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=savage, can include explicit language).
 
 **TONE & STYLE:**
-- **Be Clever:** Use witty wordplay, metaphors, and sharp analysis. Do not just list stats.
-- **Be Original:** Do not reuse phrases from the provided data summary.
-- **Use Puns & Pop Culture:** Make clever puns based on player/team names and weave in timely pop culture references.
-- **Add Emojis:** Sprinkle in thematic emojis to add flair and personality. 
-- **Be Concise:** Keep the entire summary under 250 words.
-
-**SPECIFIC INSTRUCTIONS:**
-{bench_player_instruction}
-- **Celebrate the Victor:** Praise the top-scoring team and player.
-- **Roast the Losers:** Mock the lowest-scoring players and teams, especially the starters who flopped.
-- **Analyze the Matchups:** Highlight the biggest blowout and the closest nail-biter.
+- The banter should be witty, clever, and reflect the personalities of the hosts.
+- They should have different opinions on the performances to create a debate.
+- Keep the total word count under 250 words.
+- Use emojis and pop culture references.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
 
-Your task: Create a witty, character-appropriate fantasy football recap. Start by introducing yourself as your character, then dive into the analysis. Make it memorable!"""
+Your task: Write the script for this recap show. The hosts must stay in character, debate the weekly results, and make it hilarious."""
+
+        else:
+            # SINGLE CHARACTER PROMPT
+            bench_player_instruction = ""
+            if not is_best_ball:
+                bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
+            else:
+                bench_player_instruction = """- **This is a Best Ball league, so there's no need to analyze bench players.**"""
+
+            prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league.
+
+**PERSONA:** Adopt the voice and style of {character1}. Be completely committed to this persona.
+**TRASH TALK LEVEL:** {trash_talk_level}/10 (1=friendly, 10=savage and can include explicit language).
+
+**TONE & STYLE:**
+- Be clever, witty, and use puns and pop culture references.
+- Be original and do not reuse phrases from the data below.
+- Use emojis.
+- Keep the summary under 250 words.
+
+**SPECIFIC INSTRUCTIONS:**
+{bench_player_instruction}
+- Celebrate the victors and roast the losers.
+- Analyze the biggest blowout and the closest game.
+
+**FANTASY DATA TO ANALYZE:**
+{summary}
+
+Your task: Create a witty, character-appropriate fantasy football recap. Start by introducing yourself as {character1}, then dive into the analysis. Make it memorable!"""
         
         response = model.generate_content(
             prompt,
