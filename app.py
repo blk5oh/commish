@@ -48,7 +48,6 @@ def main():
             if league_type == "Sleeper":
                 st.text_input("LeagueID", key='LeagueID')
             
-            # --- FIX: Added two columns for character inputs ---
             st.write("Choose one or two characters for the recap:")
             col1, col2 = st.columns(2)
             with col1:
@@ -70,12 +69,12 @@ def main():
 
                 league_id = st.session_state.LeagueID
                 character1 = st.session_state.Character1
-                character2 = st.session_state.Character2 # This will be an empty string if not filled
+                character2 = st.session_state.Character2
                 trash_talk_level = st.session_state['Trash Talk Level']
 
                 progress.text('Validating character(s)...')
                 progress.progress(15)
-                if not summary_generator.moderate_text_gemini(character1) or (character2 and not summary_generator.moderate_text_gemini(character2)):
+                if not summary_generator.moderate_text_gemini(character1, trash_talk_level) or (character2 and not summary_generator.moderate_text_gemini(character2, trash_talk_level)):
                     st.error("A character description contains inappropriate content. Please try again.")
                     return
                 
@@ -96,7 +95,6 @@ def main():
                 progress.text('Generating AI summary...')
                 progress.progress(50)
 
-                # --- FIX: Pass both characters to the generation function ---
                 gemini_summary_stream = summary_generator.generate_gemini_summary_streaming(
                     summary, character1, character2, trash_talk_level, is_best_ball, league_type_name
                 )
