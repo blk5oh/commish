@@ -48,7 +48,14 @@ def main():
             if league_type == "Sleeper":
                 st.text_input("LeagueID", key='LeagueID')
             
-            st.text_input("Character Description", key='Character Description', placeholder="Macho Man Randy Savage")
+            # --- FIX: Added two columns for character inputs ---
+            st.write("Choose one or two characters for the recap:")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.text_input("Character 1", key='Character1', placeholder="Macho Man Randy Savage")
+            with col2:
+                st.text_input("Character 2 (Optional)", key='Character2', placeholder="Snoop Dogg")
+            
             st.slider("Trash Talk Level", 1, 10, key='Trash Talk Level', value=5)
             submit_button = st.form_submit_button(label='🤖 Generate AI Summary')
 
@@ -57,14 +64,21 @@ def main():
                 progress = st.progress(0)
                 progress.text('Starting...')
                 
-                if not st.session_state.get('LeagueID'):
-                    st.error("LeagueID is required.")
+                if not st.session_state.get('LeagueID') or not st.session_state.get('Character1'):
+                    st.error("LeagueID and at least Character 1 are required.")
                     return
 
                 league_id = st.session_state.LeagueID
-                character_description = st.session_state['Character Description']
+                character1 = st.session_state.Character1
+                character2 = st.session_state.Character2 # This will be an empty string if not filled
                 trash_talk_level = st.session_state['Trash Talk Level']
 
+                progress.text('Validating character(s)...')
+                progress.progress(15)
+                if not summary_generator.moderate_text_gemini(character1) or (character2 and not summary_generator.moderate_text_gemini(character2)):
+                    st.error("A character description contains inappropriate content. Please try again.")
+                    return
+                
                 progress.text('Fetching league summary...')
                 progress.progress(30)
                 
@@ -82,8 +96,9 @@ def main():
                 progress.text('Generating AI summary...')
                 progress.progress(50)
 
+                # --- FIX: Pass both characters to the generation function ---
                 gemini_summary_stream = summary_generator.generate_gemini_summary_streaming(
-                    summary, character_description, trash_talk_level, is_best_ball, league_type_name
+                    summary, character1, character2, trash_talk_level, is_best_ball, league_type_name
                 )
                 
                 with st.chat_message("Commish", avatar="🤖"):
