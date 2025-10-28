@@ -94,7 +94,7 @@ Your task: Write the script for this recap show. The hosts must stay in characte
 - Be clever, witty, and use puns and pop culture references.
 - Be original and do not reuse phrases from the data below.
 - Use emojis.
-- Keep the summary under 250 words.
+- Keep the summary under 400 words.
 
 **SPECIFIC INSTRUCTIONS:**
 {bench_player_instruction}
