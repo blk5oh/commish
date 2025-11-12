@@ -5,12 +5,6 @@ from utils import summary_generator
 from utils.helper import check_availability
 import traceback
 import os
-import shutil
-import tempfile
-import time
-import json
-from requests.auth import HTTPBasicAuth
-import requests
 
 LOGGER = get_logger(__name__)
 
@@ -59,6 +53,7 @@ def main():
             submit_button = st.form_submit_button(label='🤖 Generate AI Summary')
 
         if submit_button:
+            summary, is_best_ball, league_type_name = "", False, "redraft"
             try:
                 progress = st.progress(0)
                 progress.text('Starting...')
@@ -81,8 +76,6 @@ def main():
                 progress.text('Fetching league summary...')
                 progress.progress(30)
                 
-                summary, is_best_ball, league_type_name = "", False, "redraft"
-                
                 if league_type == "Sleeper":
                     summary, is_best_ball, league_type_name = summary_generator.generate_sleeper_summary(league_id)
                 else:
@@ -95,6 +88,7 @@ def main():
                 progress.text('Generating AI summary...')
                 progress.progress(50)
 
+                # --- FIX: Try to stream the summary ---
                 gemini_summary_stream = summary_generator.generate_gemini_summary_streaming(
                     summary, character1, character2, trash_talk_level, is_best_ball, league_type_name
                 )
@@ -102,7 +96,16 @@ def main():
                 with st.chat_message("Commish", avatar="🤖"):
                     message_placeholder = st.empty()
                     full_response = ""
+                    
+                    first_chunk_received = False
                     for chunk in gemini_summary_stream:
+                        if not first_chunk_received:
+                            # Check the first chunk for the error
+                            if chunk and chunk.startswith("Error generating recap:"):
+                                # This is our API error, re-raise it to trigger the 'except' block
+                                raise Exception(chunk)
+                            first_chunk_received = True
+                        
                         if chunk is not None:
                             full_response += chunk
                             message_placeholder.markdown(full_response + "▌")
@@ -115,9 +118,32 @@ def main():
                 progress.progress(100)
                 
             except Exception as e:
+                # --- FIX: Fallback logic ---
+                # This block will catch the error we raised
                 st.error(f"An error occurred: {str(e)}")
-                LOGGER.exception(e)
-                st.text(traceback.format_exc())
+                LOGGER.warning(f"API call failed, falling back to prompt generation. Error: {str(e)}")
+                
+                if str(e).startswith("Error generating recap:"):
+                    st.warning("The API call failed (likely due to quota). Here is the prompt you can use in another LLM.")
+                    
+                    try:
+                        # We need the variables from the 'try' block
+                        llm_prompt = summary_generator.generate_llm_prompt(
+                            summary, 
+                            st.session_state.Character1, 
+                            st.session_state.Character2, 
+                            st.session_state['Trash Talk Level'], 
+                            is_best_ball, 
+                            league_type_name
+                        )
+                        st.markdown("### Your Prompt is Ready 📋")
+                        st.text_area("Prompt to copy:", llm_prompt, height=300)
+                    except Exception as prompt_e:
+                        st.error(f"Failed to generate fallback prompt: {prompt_e}")
+                else:
+                    st.error("An unexpected error occurred.")
+                    LOGGER.exception(e)
+                    st.text(traceback.format_exc())
 
 if __name__ == "__main__":
     main()
