@@ -29,12 +29,13 @@ def moderate_text_gemini(text, trash_talk_level=5):
         LOGGER.error("An error occurred during moderation: %s", str(e))
         return False
 
+# --- FUNCTION 1: The API call ---
 def generate_gemini_summary_streaming(summary, character1, character2, trash_talk_level, is_best_ball=False, league_type='redraft'):
     """
     Generate streaming fantasy football recap using Google Gemini, handling one or two characters.
     """
     try:
-        # --- FIX: Use the 'gemini-2.0-flash-exp' model as specified ---
+        # Using the model you confirmed is in the free tier
         model = genai.GenerativeModel('gemini-2.5-flash')
         
         safety_settings = {
@@ -47,9 +48,33 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
             safety_settings[HarmCategory.HARM_CATEGORY_HARASSMENT] = HarmBlockThreshold.BLOCK_NONE
             safety_settings[HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT] = HarmBlockThreshold.BLOCK_NONE
 
-        if character2:
-            # BANTER PROMPT
-            prompt = f"""You are a scriptwriter for a fantasy football recap show. Your task is to write a script for a playful banter and debate between two co-hosts: {character1} and {character2}.
+        # --- Generate the prompt ---
+        prompt = generate_llm_prompt(summary, character1, character2, trash_talk_level, is_best_ball, league_type)
+        
+        # --- Call the API ---
+        response = model.generate_content(
+            prompt,
+            stream=True,
+            generation_config=genai.types.GenerationConfig(temperature=0.9, max_output_tokens=1000),
+            safety_settings=safety_settings
+        )
+        
+        for chunk in response:
+            if chunk.text:
+                yield chunk.text
+                
+    except Exception as e:
+        # Yield the error message so the app can catch it
+        yield f"Error generating recap: {str(e)}"
+
+# --- FUNCTION 2: The Fallback Prompt Generator ---
+def generate_llm_prompt(summary, character1, character2, trash_talk_level, is_best_ball=False, league_type='redraft'):
+    """
+    Generates the complete prompt string for the user to copy and paste into an LLM.
+    """
+    if character2:
+        # BANTER PROMPT
+        prompt = f"""You are a scriptwriter for a fantasy football recap show. Your task is to write a script for a playful banter and debate between two co-hosts: {character1} and {character2}.
 
 Here are your instructions:
 
@@ -69,7 +94,7 @@ Here are your instructions:
 **TONE & STYLE:**
 - The banter should be witty, clever, and reflect the personalities of the hosts.
 - They should have different opinions on the performances to create a debate.
-- Keep the total word count under 250 words.
+- Keep the total word count under 400 words.
 - Use emojis and pop culture references.
 
 **FANTASY DATA TO ANALYZE:**
@@ -77,15 +102,15 @@ Here are your instructions:
 
 Your task: Write the script for this recap show. The hosts must stay in character, debate the weekly results, and make it hilarious."""
 
+    else:
+        # SINGLE CHARACTER PROMPT
+        bench_player_instruction = ""
+        if not is_best_ball:
+            bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
         else:
-            # SINGLE CHARACTER PROMPT
-            bench_player_instruction = ""
-            if not is_best_ball:
-                bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
-            else:
-                bench_player_instruction = """- **This is a Best Ball league, so there's no need to analyze bench players.**"""
+            bench_player_instruction = """- **This is a Best Ball league, so there's no need to analyze bench players.**"""
 
-            prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league.
+        prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league.
 
 **PERSONA:** Adopt the voice and style of {character1}. Be completely committed to this persona.
 **TRASH TALK LEVEL:** {trash_talk_level}/10 (1=friendly, 10=savage and can include explicit language).
@@ -94,7 +119,7 @@ Your task: Write the script for this recap show. The hosts must stay in characte
 - Be clever, witty, and use puns and pop culture references.
 - Be original and do not reuse phrases from the data below.
 - Use emojis.
-- Keep the summary under 400 words.
+- Keep the summary under 250 words.
 
 **SPECIFIC INSTRUCTIONS:**
 {bench_player_instruction}
@@ -105,21 +130,10 @@ Your task: Write the script for this recap show. The hosts must stay in characte
 {summary}
 
 Your task: Create a witty, character-appropriate fantasy football recap. Start by introducing yourself as {character1}, then dive into the analysis. Make it memorable!"""
-        
-        response = model.generate_content(
-            prompt,
-            stream=True,
-            generation_config=genai.types.GenerationConfig(temperature=0.9, max_output_tokens=1000),
-            safety_settings=safety_settings
-        )
-        
-        for chunk in response:
-            if chunk.text:
-                yield chunk.text
-                
-    except Exception as e:
-        yield f"Error generating recap: {str(e)}"
+    
+    return prompt
 
+# --- FUNCTION 3: The Data Fetcher ---
 @st.cache_data(ttl=3600)
 def generate_sleeper_summary(league_id):
     """Generates a human-friendly summary for a Sleeper league, now aware of Best Ball leagues."""
@@ -175,7 +189,7 @@ def generate_sleeper_summary(league_id):
         summary_parts = [
             f"### Weekly Standouts (Week {week})\n",
             f"**Top Scoring Team:** {highest_scoring_team_name} with **{highest_scoring_team_score:.2f}** points.\n",
-            f"**Top Player:** {hs_player} with **{hs_score:.2f}** points (Team: {hs_team}).\n",
+            f"**Top Player:** {hs_player} with **{hs_score:.2f}** points (Team: {hs_team}).n",
             f"**Lowest Scoring Starter:** {ls_starter} with **{ls_score:.2f}** points (Team: {ls_team}).\n",
         ]
 
