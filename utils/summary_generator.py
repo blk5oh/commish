@@ -35,7 +35,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     """
     try:
         # --- FIX: Use the 'gemini-2.0-flash-exp' model as specified ---
-        model = genai.GenerativeModel('gemini-2.0-flash-exp')
+        model = genai.GenerativeModel('gemini-2.5-flash')
         
         safety_settings = {
             HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
