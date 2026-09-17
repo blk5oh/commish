@@ -75,7 +75,7 @@ def generate_llm_prompt(summary, character1, character2, trash_talk_level, is_be
     """
     if character2:
         # BANTER PROMPT
-        prompt = f"""You are generating the direct transcript for a live fantasy football podcast. The show features a playful debate between two co-hosts: {character1} and {character2}.
+        prompt = f"""You are generating the direct transcript for a live fantasy football podcast. The show features a playful, rapid-fire debate between two co-hosts: {character1} and {character2}.
 
 Here are your STRICT instructions:
 
@@ -92,15 +92,16 @@ Here are your STRICT instructions:
 - Trash Talk Level: {trash_talk_level}/10. (1=friendly, 10=loud, boastful, and highly competitive, but keep it strictly PG-13 and good-natured).
 - Use emojis and pop culture references.
 
-**LENGTH & SCOPE:**
-- Keep the entire transcript under 600 words total. 
-- Do not waste time on long introductions. Get straight to roasting and praising the teams.
-- Focus ONLY on the absolute biggest highlights, not every single stat.
+**LENGTH & SCOPE (CRITICAL):**
+- Make it SHORT and PUNCHY. The entire transcript must be under 300 words.
+- Each host should only speak 2 or 3 times. 
+- KEEP TURNS SHORT: Maximum 2 to 3 sentences per turn. No long monologues.
+- Focus ONLY on the absolute biggest highlight or biggest bust. Ignore the rest of the stats.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
 
-Your task: Write the fast-paced podcast transcript. Jump right into the dialogue, stay in character, and make it hilarious."""
+Your task: Write the fast-paced, punchy podcast transcript. Jump right into the dialogue, stay in character, and keep it brief."""
 
     else:
         # SINGLE CHARACTER PROMPT
@@ -119,7 +120,7 @@ Your task: Write the fast-paced podcast transcript. Jump right into the dialogue
 - Be clever, witty, and use puns and pop culture references.
 - Be original and do not reuse phrases from the data below.
 - Use emojis.
-- Keep the summary under 400 words.
+- Keep the summary under 300 words.
 
 **SPECIFIC INSTRUCTIONS:**
 {bench_player_instruction}
