@@ -55,7 +55,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.9, 
-                max_output_tokens=2000,
+                max_output_tokens=3000,
                 safety_settings=safety_settings
             )
         )
@@ -77,31 +77,28 @@ def generate_llm_prompt(summary, character1, character2, trash_talk_level, is_be
         # BANTER PROMPT
         prompt = f"""You are a scriptwriter for a fantasy football recap show. Your task is to write a script for a playful banter and debate between two co-hosts: {character1} and {character2}.
 
-Here are your instructions:
+Here are your strict instructions:
 
 **FORMAT:**
-- Write the script as a dialogue. For example:
+- Write the script as direct dialogue ONLY. For example:
   {character1}: [dialogue]
   {character2}: [dialogue]
-- The hosts should interrupt, react to, and build upon each other's points while still delivering the weekly recap.
+- DO NOT include any stage directions, physical actions, or scene headings (e.g., do not write "**INT. STUDIO**" or "(Laughs)").
 
-**PERSONAS:**
-- {character1} must speak and act exactly like their real-life persona.
-- {character2} must also be perfectly in character.
+**PERSONAS & TONE:**
+- {character1} and {character2} must speak exactly like their real-life personas.
 - Their personalities should clash or combine in a funny and engaging way.
-
-**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=loud, boastful, and highly competitive, but keep it strictly PG-13 and good-natured).
-
-**TONE & STYLE:**
-- The banter should be witty, clever, and reflect the personalities of the hosts.
-- They should have different opinions on the performances to create a debate.
-- Keep the total word count under 400 words.
+- Trash Talk Level: {trash_talk_level}/10. (1=friendly, 10=loud, boastful, and highly competitive, but keep it strictly PG-13 and good-natured).
 - Use emojis and pop culture references.
+
+**LENGTH & SCOPE:**
+- Keep the entire script under 600 words total. 
+- Each host should only speak 2 or 3 times. Focus ONLY on the absolute biggest highlights, not every single stat.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
 
-Your task: Write the script for this recap show. The hosts must stay in character, playfully debate the weekly results, and make it hilarious."""
+Your task: Write the fast-paced script for this recap show. The hosts must stay in character, playfully debate the biggest highlights, and make it hilarious."""
 
     else:
         # SINGLE CHARACTER PROMPT
@@ -120,7 +117,7 @@ Your task: Write the script for this recap show. The hosts must stay in characte
 - Be clever, witty, and use puns and pop culture references.
 - Be original and do not reuse phrases from the data below.
 - Use emojis.
-- Keep the summary under 250 words.
+- Keep the summary under 400 words.
 
 **SPECIFIC INSTRUCTIONS:**
 {bench_player_instruction}
