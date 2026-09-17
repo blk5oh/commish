@@ -1,5 +1,4 @@
 import streamlit as st
-import google.generativeai as genai
 from streamlit.logger import get_logger
 from utils import summary_generator
 from utils.helper import check_availability
@@ -8,9 +7,6 @@ import os
 
 LOGGER = get_logger(__name__)
 
-# Configure Google Gemini
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-genai.configure(api_key=GOOGLE_API_KEY)
 
 st.set_page_config(
     page_title="Commish.ai",
