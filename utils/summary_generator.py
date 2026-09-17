@@ -3,8 +3,8 @@ import os
 import json
 from sleeper_wrapper import League as SleeperLeague
 from utils import sleeper_helper, helper
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from google import genai
+from google.genai import types
 import datetime
 from streamlit.logger import get_logger
 
@@ -35,24 +35,29 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     Generate streaming fantasy football recap using Google Gemini, handling one or two characters.
     """
     try:
-        model = genai.GenerativeModel('gemini-2.5-flash')
+        # Initialize the new client using your Streamlit secrets
+        client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
         
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-        }
+        # New safety settings format
+        safety_settings = [
+            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+            types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
+        ]
 
         # --- Generate the prompt ---
         prompt = generate_llm_prompt(summary, character1, character2, trash_talk_level, is_best_ball, league_type)
         
         # --- Call the API ---
-        response = model.generate_content(
-            prompt,
-            stream=True,
-            generation_config=genai.types.GenerationConfig(temperature=0.9, max_output_tokens=1000),
-            safety_settings=safety_settings
+        response = client.models.generate_content_stream(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.9, 
+                max_output_tokens=2000,
+                safety_settings=safety_settings
+            )
         )
         
         for chunk in response:
@@ -109,7 +114,7 @@ Your task: Write the script for this recap show. The hosts must stay in characte
         prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league.
 
 **PERSONA:** Adopt the voice and style of {character1}. Be completely committed to this persona.
-**TRASH TALK LEVEL:** {trash_talk_level}/10 (1=friendly, 10=savage and can include explicit language).
+**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=merciless and savage, but keep the language PG-13).
 
 **TONE & STYLE:**
 - Be clever, witty, and use puns and pop culture references.
@@ -133,11 +138,17 @@ Your task: Create a witty, character-appropriate fantasy football recap. Start b
 @st.cache_data(ttl=3600)
 def generate_sleeper_summary(league_id):
     """Generates a human-friendly summary for a Sleeper league, now aware of Best Ball leagues."""
+    league_id = str(league_id).strip()
     league = SleeperLeague(league_id)
     week = helper.get_safest_week_for_recap(datetime.datetime.now())
     
     try:
         league_data = league.get_league()
+        
+        # sleeper-wrapper returns the error object if the API call fails
+        if not isinstance(league_data, dict):
+            return f"Sleeper API Error: Could not find a league with ID '{league_id}'. Ensure you are using the 18-digit numeric ID for the current season.", False, 'redraft'
+            
         settings = league_data.get('settings', {})
         is_best_ball = settings.get('best_ball', 0) == 1
         league_type_name = league_data.get('type', 'redraft')
@@ -199,10 +210,14 @@ def generate_sleeper_summary(league_id):
             f"**Biggest Blowout:** {blowout_text} (Point Differential: **{blowout_diff:.2f}**)\n",
             f"**Closest Game:** {close_text} (Point Differential: **{close_diff:.2f}**)\n",
             "\n---\n",
-            f"### League Power Rankings\n",
-            f"1. **{top_3_teams_result[0][0]}** ({top_3_teams_result[0][1]}W-{top_3_teams_result[0][2]}L) - {float(top_3_teams_result[0][3]):.2f} total points\n",
-            f"2. **{top_3_teams_result[1][0]}** ({top_3_teams_result[1][1]}W-{top_3_teams_result[1][2]}L) - {float(top_3_teams_result[1][3]):.2f} total points\n",
-            f"3. **{top_3_teams_result[2][0]}** ({top_3_teams_result[2][1]}W-{top_3_teams_result[2][2]}L) - {float(top_3_teams_result[2][3]):.2f} total points\n",
+            f"### League Power Rankings\n"
+        ])
+        
+        # Safely loop through the power rankings instead of hardcoding indexes
+        for i, team in enumerate(top_3_teams_result):
+            summary_parts.append(f"{i+1}. **{team[0]}** ({team[1]}W-{team[2]}L) - {float(team[3]):.2f} total points\n")
+
+        summary_parts.extend([
             "\n---\n",
             f"### Team Streaks\n",
             f"**Hottest Team:** {hottest_team} is on a **{streak}** game win streak."
