@@ -35,21 +35,14 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     Generate streaming fantasy football recap using Google Gemini, handling one or two characters.
     """
     try:
-        # Using the model you confirmed is in the free tier
         model = genai.GenerativeModel('gemini-2.5-flash')
-        system_instruction=f"You are a world-class fantasy football commentator. Adopt the exact persona, voice, and style of {character1}. Never break character."
-        )
         
         safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
-    }
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
         }
-        if trash_talk_level == 10:
-            safety_settings[HarmCategory.HARM_CATEGORY_HARASSMENT] = HarmBlockThreshold.BLOCK_NONE
-            safety_settings[HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT] = HarmBlockThreshold.BLOCK_NONE
 
         # --- Generate the prompt ---
         prompt = generate_llm_prompt(summary, character1, character2, trash_talk_level, is_best_ball, league_type)
