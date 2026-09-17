@@ -75,15 +75,16 @@ def generate_llm_prompt(summary, character1, character2, trash_talk_level, is_be
     """
     if character2:
         # BANTER PROMPT
-        prompt = f"""You are a scriptwriter for a fantasy football recap show. Your task is to write a script for a playful banter and debate between two co-hosts: {character1} and {character2}.
+        prompt = f"""You are generating the direct transcript for a live fantasy football podcast. The show features a playful debate between two co-hosts: {character1} and {character2}.
 
-Here are your strict instructions:
+Here are your STRICT instructions:
 
-**FORMAT:**
-- Write the script as direct dialogue ONLY. For example:
+**FORMATTING (CRITICAL):**
+1. ONLY output the spoken dialogue. Start immediately with the first host speaking.
+2. ABSOLUTELY NO stage directions, scene headings, or parenthetical actions. (DO NOT write "INT. STUDIO", DO NOT write "(laughs)").
+3. Format exactly like this:
   {character1}: [dialogue]
   {character2}: [dialogue]
-- DO NOT include any stage directions, physical actions, or scene headings (e.g., do not write "**INT. STUDIO**" or "(Laughs)").
 
 **PERSONAS & TONE:**
 - {character1} and {character2} must speak exactly like their real-life personas.
@@ -92,13 +93,14 @@ Here are your strict instructions:
 - Use emojis and pop culture references.
 
 **LENGTH & SCOPE:**
-- Keep the entire script under 600 words total. 
-- Each host should only speak 2 or 3 times. Focus ONLY on the absolute biggest highlights, not every single stat.
+- Keep the entire transcript under 600 words total. 
+- Do not waste time on long introductions. Get straight to roasting and praising the teams.
+- Focus ONLY on the absolute biggest highlights, not every single stat.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
 
-Your task: Write the fast-paced script for this recap show. The hosts must stay in character, playfully debate the biggest highlights, and make it hilarious."""
+Your task: Write the fast-paced podcast transcript. Jump right into the dialogue, stay in character, and make it hilarious."""
 
     else:
         # SINGLE CHARACTER PROMPT
@@ -123,14 +125,14 @@ Your task: Write the fast-paced script for this recap show. The hosts must stay 
 {bench_player_instruction}
 - Celebrate the victors and playfully poke fun at the losers. Do not use overly aggressive or harassing language.
 - Analyze the biggest blowout and the closest game.
+- Start immediately with the recap. Do not write any stage directions.
 
 **FANTASY DATA TO ANALYZE:**
 {summary}
 
-Your task: Create a witty, character-appropriate fantasy football recap. Start by introducing yourself as {character1}, then dive into the analysis. Make it memorable!"""
+Your task: Create a witty, character-appropriate fantasy football recap. Start by introducing yourself as {character1}, then dive directly into the analysis. Make it memorable!"""
     
     return prompt
-
 # --- FUNCTION 3: The Data Fetcher ---
 @st.cache_data(ttl=3600)
 def generate_sleeper_summary(league_id):
