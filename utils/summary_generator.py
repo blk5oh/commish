@@ -38,7 +38,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
         # Initialize the new client using your Streamlit secrets
         client = genai.Client(api_key=st.secrets["GOOGLE_API_KEY"])
         
-        # New safety settings format
+        # New safety settings format (This actually forces the API to stop blocking!)
         safety_settings = [
             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HARASSMENT, threshold=types.HarmBlockThreshold.BLOCK_NONE),
             types.SafetySetting(category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold=types.HarmBlockThreshold.BLOCK_NONE),
@@ -67,7 +67,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     except Exception as e:
         # Yield the error message so the app can catch it
         yield f"Error generating recap: {str(e)}"
-
+        
 # --- FUNCTION 2: The Fallback Prompt Generator ---
 def generate_llm_prompt(summary, character1, character2, trash_talk_level, is_best_ball=False, league_type='redraft'):
     """
