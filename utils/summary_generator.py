@@ -37,6 +37,8 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     try:
         # Using the model you confirmed is in the free tier
         model = genai.GenerativeModel('gemini-2.5-flash')
+        system_instruction=f"You are a world-class fantasy football commentator. Adopt the exact persona, voice, and style of {character1}. Never break character."
+)
         
         safety_settings = {
         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
@@ -190,7 +192,7 @@ def generate_sleeper_summary(league_id):
         summary_parts = [
             f"### Weekly Standouts (Week {week})\n",
             f"**Top Scoring Team:** {highest_scoring_team_name} with **{highest_scoring_team_score:.2f}** points.\n",
-            f"**Top Player:** {hs_player} with **{hs_score:.2f}** points (Team: {hs_team}).n",
+            f"**Top Player:** {hs_player} with **{hs_score:.2f}** points (Team: {hs_team}).\n",
             f"**Lowest Scoring Starter:** {ls_starter} with **{ls_score:.2f}** points (Team: {ls_team}).\n",
         ]
 
