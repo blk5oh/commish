@@ -2,6 +2,6 @@ streamlit
 sleeper-wrapper
 espn-api
 yfpy
-google-generativeai
+google-genai
 requests
 pytz
