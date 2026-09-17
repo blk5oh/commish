@@ -9,6 +9,10 @@ def get_player_name_from_id(player_id, players_data):
     player_info = players_data.get(str(player_id))
     if player_info:
         return f"{player_info.get('first_name', '')} {player_info.get('last_name', '')}".strip()
+    
+    if str(player_id).isalpha():
+        return f"{player_id} DEF"
+        
     return "Unknown Player"
 
 def calculate_scoreboards(matchups, team_name_map, roster_owner_map):
