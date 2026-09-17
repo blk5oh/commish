@@ -85,7 +85,7 @@ Here are your instructions:
 - {character2} must also be perfectly in character.
 - Their personalities should clash or combine in a funny and engaging way.
 
-**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=savage, can include explicit language).
+**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=merciless and savage, but keep the language PG-13).
 
 **TONE & STYLE:**
 - The banter should be witty, clever, and reflect the personalities of the hosts.
