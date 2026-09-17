@@ -7,3 +7,6 @@ font="sans serif"
 
 [logger]
 level = 'debug'
+
+[server]
+folderWatchBlacklist = ['**/__pycache__']
