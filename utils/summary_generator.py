@@ -37,8 +37,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
     try:
         # Using the model you confirmed is in the free tier
         model = genai.GenerativeModel('gemini-2.5-flash')
-        system_instruction=f"You are a world-class fantasy football commentator. Adopt the exact persona, voice, and style of {character1}. Never break character."
-)
+        system_instruction=f"You are a world-class fantasy football commentator. Adopt the exact persona, voice, and style of {character1}. Never break character.")
         
         safety_settings = {
         HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
