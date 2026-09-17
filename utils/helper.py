@@ -28,17 +28,17 @@ def get_nfl_season_year(current_date):
 
 def get_nfl_week_1_start(season_year):
     """
-    Calculates the fantasy start of NFL Week 1 (the Tuesday of the week of the first game).
+    Calculates the fantasy start of NFL Week 1 (the Tuesday after Labor Day).
     """
     first_of_sept = datetime(season_year, 9, 1)
-    # Find the first Thursday of September
-    days_until_thursday = (3 - first_of_sept.weekday() + 7) % 7
-    first_thursday = first_of_sept + timedelta(days=days_until_thursday)
     
-    # --- FIX: The start of the fantasy week is the Tuesday before the first Thursday game ---
-    # Tuesday is weekday 1.
-    days_from_thursday_to_tuesday = first_thursday.weekday() - 1
-    week_1_start_date = first_thursday - timedelta(days=days_from_thursday_to_tuesday)
+    # Labor Day is the first Monday in September
+    days_to_first_monday = (0 - first_of_sept.weekday()) % 7
+    labor_day = first_of_sept + timedelta(days=days_to_first_monday)
+    
+    # NFL kickoff is Thursday after Labor Day. 
+    # Fantasy Week 1 starts the Tuesday before that Thursday (day after Labor Day)
+    return labor_day + timedelta(days=1)
     
     return week_1_start_date
 
