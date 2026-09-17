@@ -90,7 +90,7 @@ Here are your instructions:
 - {character2} must also be perfectly in character.
 - Their personalities should clash or combine in a funny and engaging way.
 
-**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=merciless and savage, but keep the language PG-13).
+**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=loud, boastful, and highly competitive, but keep it strictly PG-13 and good-natured).
 
 **TONE & STYLE:**
 - The banter should be witty, clever, and reflect the personalities of the hosts.
@@ -101,20 +101,20 @@ Here are your instructions:
 **FANTASY DATA TO ANALYZE:**
 {summary}
 
-Your task: Write the script for this recap show. The hosts must stay in character, debate the weekly results, and make it hilarious."""
+Your task: Write the script for this recap show. The hosts must stay in character, playfully debate the weekly results, and make it hilarious."""
 
     else:
         # SINGLE CHARACTER PROMPT
         bench_player_instruction = ""
         if not is_best_ball:
-            bench_player_instruction = """- **High Points on the Bench:** This is a sign of terrible management. Mercilessly make fun of any manager who left a high-scoring player on their bench. It's a fireable offense! 🔥"""
+            bench_player_instruction = "- **High Points on the Bench:** Lightly tease any manager who left a high-scoring player on their bench. Question their coaching decisions! 😅"
         else:
-            bench_player_instruction = """- **This is a Best Ball league, so there's no need to analyze bench players.**"""
+            bench_player_instruction = "- **This is a Best Ball league, so there's no need to analyze bench players.**"
 
         prompt = f"""You are a world-class fantasy football commentator, tasked with creating a weekly recap for a '{league_type}' league.
 
 **PERSONA:** Adopt the voice and style of {character1}. Be completely committed to this persona.
-**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=merciless and savage, but keep the language PG-13).
+**TRASH TALK LEVEL:** {trash_talk_level}/10. (1=friendly, 10=loud, boastful, and highly competitive, but keep it strictly PG-13 and good-natured).
 
 **TONE & STYLE:**
 - Be clever, witty, and use puns and pop culture references.
@@ -124,7 +124,7 @@ Your task: Write the script for this recap show. The hosts must stay in characte
 
 **SPECIFIC INSTRUCTIONS:**
 {bench_player_instruction}
-- Celebrate the victors and roast the losers.
+- Celebrate the victors and playfully poke fun at the losers. Do not use overly aggressive or harassing language.
 - Analyze the biggest blowout and the closest game.
 
 **FANTASY DATA TO ANALYZE:**
