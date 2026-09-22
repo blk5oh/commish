@@ -55,7 +55,7 @@ def generate_gemini_summary_streaming(summary, character1, character2, trash_tal
             contents=prompt,
             config=types.GenerateContentConfig(
                 temperature=0.9, 
-                max_output_tokens=3000,
+                max_output_tokens=4000,
                 safety_settings=safety_settings
             )
         )
@@ -93,7 +93,7 @@ Here are your STRICT instructions:
 - Use emojis and pop culture references.
 
 **LENGTH & SCOPE (CRITICAL):**
-- Make it SHORT and PUNCHY. The entire transcript must be under 300 words.
+- Make it SHORT and PUNCHY. The entire transcript must be under 600 words.
 - Each host should only speak 2 or 3 times. 
 - KEEP TURNS SHORT: Maximum 2 to 3 sentences per turn. No long monologues.
 - Focus ONLY on the absolute biggest highlight or biggest bust. Ignore the rest of the stats.
